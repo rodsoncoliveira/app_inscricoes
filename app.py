@@ -270,19 +270,26 @@ elif st.session_state.page == 'register':
                     oficina_id_2 = chosen_workshop_2['id'] if chosen_workshop_2 else None
                     data_nasc_str = data_nascimento.isoformat()
 
-                    success, result, action = db.create_registration(
-                        evento_id=event['id'],
-                        nome=nome,
-                        data_nascimento=data_nasc_str,
-                        whatsapp=whatsapp,
-                        igreja=igreja,
-                        oficina_id=oficina_id,
-                        oficina_id_2=oficina_id_2,
-                        responsavel_nome=responsavel_nome.strip() if responsavel_nome else None,
-                        responsavel_telefone=responsavel_telefone.strip() if responsavel_telefone else None,
-                    )
+                    with st.status("Salvando sua inscrição...", expanded=True) as save_status:
+                        st.write("Validando vagas e registrando seus dados...")
+                        success, result, action = db.create_registration(
+                            evento_id=event['id'],
+                            nome=nome,
+                            data_nascimento=data_nasc_str,
+                            whatsapp=whatsapp,
+                            igreja=igreja,
+                            oficina_id=oficina_id,
+                            oficina_id_2=oficina_id_2,
+                            responsavel_nome=responsavel_nome.strip() if responsavel_nome else None,
+                            responsavel_telefone=responsavel_telefone.strip() if responsavel_telefone else None,
+                        )
 
                     if success:
+                        save_status.update(
+                            label="Inscrição confirmada!",
+                            state="complete",
+                            expanded=False,
+                        )
                         workshops_summary = []
                         if chosen_workshop_1:
                             workshops_summary.append({
@@ -313,6 +320,11 @@ elif st.session_state.page == 'register':
 
                         st.rerun()
                     else:
+                        save_status.update(
+                            label="Não foi possível salvar a inscrição",
+                            state="error",
+                            expanded=False,
+                        )
                         st.error(f"Erro ao realizar inscrição: {result}")
 
             if st.button("Voltar ao Início", key="btn_back_home", use_container_width=True):
