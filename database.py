@@ -257,6 +257,19 @@ def _init_postgres():
         cursor = conn.cursor()
         for statement in ddl_statements:
             cursor.execute(statement)
+        _ensure_eventos_columns(cursor)
+
+
+def _ensure_eventos_columns(cursor):
+    """Garante colunas novas na tabela eventos sem recriar o banco."""
+    if uses_postgres():
+        cursor.execute("ALTER TABLE eventos ADD COLUMN IF NOT EXISTS whatsapp_grupo_url TEXT")
+        return
+
+    cursor.execute("PRAGMA table_info(eventos);")
+    columns = [row["name"] for row in cursor.fetchall()]
+    if "whatsapp_grupo_url" not in columns:
+        cursor.execute("ALTER TABLE eventos ADD COLUMN whatsapp_grupo_url TEXT;")
 
 
 def _init_sqlite():
@@ -339,6 +352,23 @@ def _init_sqlite():
             except sqlite3.OperationalError:
                 pass
 
+        _ensure_eventos_columns(cursor)
+
+
+def normalize_whatsapp_group_url(url):
+    """Normaliza link de convite do grupo WhatsApp."""
+    if not url:
+        return ""
+    normalized = str(url).strip()
+    if not normalized:
+        return ""
+    if normalized.startswith("www."):
+        normalized = f"https://{normalized}"
+    if not normalized.startswith(("http://", "https://")):
+        if "chat.whatsapp.com" in normalized:
+            normalized = f"https://{normalized}"
+    return normalized
+
 
 # --- OPERAÇÕES DE EVENTOS ---
 
@@ -353,7 +383,9 @@ def create_event(
     cor_primaria,
     cor_secundaria,
     ativo=1,
+    whatsapp_grupo_url=None,
 ):
+    whatsapp_grupo_url = normalize_whatsapp_group_url(whatsapp_grupo_url) or None
     with get_connection() as conn:
         cursor = conn.cursor()
         if uses_postgres():
@@ -362,9 +394,9 @@ def create_event(
                 """
                 INSERT INTO eventos (
                     nome, descricao, data_inicio, data_fim, inicio_inscricoes, fim_inscricoes,
-                    banner_path, cor_primaria, cor_secundaria, ativo
+                    banner_path, cor_primaria, cor_secundaria, ativo, whatsapp_grupo_url
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -378,6 +410,7 @@ def create_event(
                     cor_primaria,
                     cor_secundaria,
                     ativo,
+                    whatsapp_grupo_url,
                 ),
             )
             return _fetchone_dict(cursor)["id"]
@@ -387,9 +420,9 @@ def create_event(
             """
             INSERT INTO eventos (
                 nome, descricao, data_inicio, data_fim, inicio_inscricoes, fim_inscricoes,
-                banner_path, cor_primaria, cor_secundaria, ativo
+                banner_path, cor_primaria, cor_secundaria, ativo, whatsapp_grupo_url
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 nome,
@@ -402,6 +435,7 @@ def create_event(
                 cor_primaria,
                 cor_secundaria,
                 ativo,
+                whatsapp_grupo_url,
             ),
         )
         return cursor.lastrowid
@@ -480,7 +514,9 @@ def update_event(
     cor_primaria,
     cor_secundaria,
     ativo,
+    whatsapp_grupo_url=None,
 ):
+    whatsapp_grupo_url = normalize_whatsapp_group_url(whatsapp_grupo_url) or None
     with get_connection() as conn:
         cursor = conn.cursor()
         _execute(
@@ -489,7 +525,7 @@ def update_event(
             UPDATE eventos
             SET nome = %s, descricao = %s, data_inicio = %s, data_fim = %s,
                 inicio_inscricoes = %s, fim_inscricoes = %s, banner_path = %s,
-                cor_primaria = %s, cor_secundaria = %s, ativo = %s
+                cor_primaria = %s, cor_secundaria = %s, ativo = %s, whatsapp_grupo_url = %s
             WHERE id = %s
             """,
             (
@@ -503,6 +539,7 @@ def update_event(
                 cor_primaria,
                 cor_secundaria,
                 ativo,
+                whatsapp_grupo_url,
                 event_id,
             ),
         )

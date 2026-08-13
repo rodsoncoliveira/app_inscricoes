@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS eventos (
     banner_path TEXT,
     cor_primaria TEXT DEFAULT '#FF5733',
     cor_secundaria TEXT DEFAULT '#1e1e24',
-    ativo INTEGER DEFAULT 1
+    ativo INTEGER DEFAULT 1,
+    whatsapp_grupo_url TEXT
 );
 
 CREATE TABLE IF NOT EXISTS oficinas (

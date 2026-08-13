@@ -593,6 +593,25 @@ def render_registration_summary(summary):
     )
     st.markdown(summary_html, unsafe_allow_html=True)
 
+
+def render_whatsapp_group_cta(group_url):
+    """Botão para entrar no grupo oficial do evento no WhatsApp."""
+    if not group_url:
+        return
+
+    st.markdown("---")
+    st.markdown("#### 📱 Grupo oficial do congresso")
+    st.caption(
+        "Entre no grupo do WhatsApp para receber avisos e novidades. "
+        "Você precisa tocar no botão e confirmar a entrada no app."
+    )
+    st.link_button(
+        "Entrar no grupo do WhatsApp",
+        group_url,
+        use_container_width=True,
+        type="primary",
+    )
+
 def render_card_banner(banner_path):
     """Renderiza o banner no topo do card da home."""
     resolved_path = resolve_banner_path(banner_path)

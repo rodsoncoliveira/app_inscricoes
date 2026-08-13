@@ -76,6 +76,12 @@ def render_event_registration_header(event):
     st.write(event["descricao"])
     st.markdown("---")
 
+def render_whatsapp_group_for_event(event):
+    """Exibe CTA do grupo WhatsApp se o evento tiver link configurado."""
+    group_url = db.normalize_whatsapp_group_url(event.get("whatsapp_grupo_url"))
+    if group_url:
+        styles.render_whatsapp_group_cta(group_url)
+
 def get_admin_password():
     """Senha do admin via secrets (produção) ou fallback local."""
     try:
@@ -215,6 +221,7 @@ elif st.session_state.page == 'register':
                 st.session_state.registration_summary = summary
 
             styles.render_registration_summary(summary)
+            render_whatsapp_group_for_event(event)
 
             if st.button("Voltar ao Início", key="btn_back_after_register", use_container_width=True):
                 st.session_state.registration_summary = None
@@ -359,6 +366,8 @@ elif st.session_state.page == 'choose_workshops':
             st.balloons()
             pending["celebration_shown"] = True
             st.session_state.pending_registration = pending
+
+        render_whatsapp_group_for_event(event)
 
         workshops = db.get_workshop_vagas_info(event['id'])
         registration = db.get_registration(pending["id"])
@@ -527,6 +536,13 @@ elif st.session_state.page == 'admin':
                         type=["jpg", "jpeg", "png"],
                         key="edit_banner_upload",
                     )
+
+                    edit_whatsapp_grupo_url = st.text_input(
+                        "Link do grupo WhatsApp (opcional)",
+                        value=ev_to_edit.get("whatsapp_grupo_url") or "",
+                        placeholder="https://chat.whatsapp.com/...",
+                        help="Link de convite do grupo. Após a inscrição, o participante verá um botão para entrar.",
+                    )
                     
                     col5, col6 = st.columns(2)
                     edit_cor_primaria = col5.color_picker("Cor Primária", value=ev_to_edit['cor_primaria'])
@@ -570,7 +586,8 @@ elif st.session_state.page == 'admin':
                                 banner_path=banner_path,
                                 cor_primaria=edit_cor_primaria,
                                 cor_secundaria=edit_cor_secundaria,
-                                ativo=1 if edit_ativo else 0
+                                ativo=1 if edit_ativo else 0,
+                                whatsapp_grupo_url=edit_whatsapp_grupo_url,
                             )
                             st.success("Evento atualizado com sucesso!")
                             st.session_state.editing_event_id = None
@@ -600,6 +617,12 @@ elif st.session_state.page == 'admin':
                         "Banner do Evento",
                         type=["jpg", "jpeg", "png"],
                         key="create_banner_upload",
+                    )
+
+                    whatsapp_grupo_url = st.text_input(
+                        "Link do grupo WhatsApp (opcional)",
+                        placeholder="https://chat.whatsapp.com/...",
+                        help="Link de convite do grupo exibido após a inscrição.",
                     )
                     
                     col5, col6 = st.columns(2)
@@ -636,7 +659,8 @@ elif st.session_state.page == 'admin':
                                 banner_path=banner_path,
                                 cor_primaria=cor_primaria,
                                 cor_secundaria=cor_secundaria,
-                                ativo=1 if ativo else 0
+                                ativo=1 if ativo else 0,
+                                whatsapp_grupo_url=whatsapp_grupo_url,
                             )
                             st.success("Evento cadastrado com sucesso!")
                             st.rerun()
