@@ -545,6 +545,42 @@ def apply_admin_workshops_styles():
     """
     st.markdown(workshops_css, unsafe_allow_html=True)
 
+
+def apply_admin_dashboard_styles():
+    """Estilos do dashboard administrativo."""
+    dashboard_css = """
+    <style>
+    .dash-status-pill {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+    }
+
+    .dash-status-open {
+        background: rgba(37, 211, 102, 0.15);
+        color: #86efac;
+        border: 1px solid rgba(37, 211, 102, 0.35);
+    }
+
+    .dash-status-closed {
+        background: rgba(248, 113, 113, 0.12);
+        color: #fca5a5;
+        border: 1px solid rgba(248, 113, 113, 0.28);
+    }
+
+    .dash-section-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #f4f4f5;
+        margin: 0 0 0.35rem 0;
+    }
+    </style>
+    """
+    st.markdown(dashboard_css, unsafe_allow_html=True)
+
 def apply_event_styles(cor_primaria, cor_secundaria):
     """Injeta regras de estilo customizadas dinamicamente de acordo com o tema do evento selecionado."""
     event_css = f"""

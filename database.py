@@ -1287,4 +1287,80 @@ def delete_registration(registration_id):
         _execute(cursor, "DELETE FROM inscricoes WHERE id = %s", (registration_id,))
 
 
+def get_event_dashboard_data(evento_id):
+    """Agrega métricas e séries para o dashboard admin do evento."""
+    event = get_event(evento_id)
+    if not event:
+        return None
+
+    registrations = get_registrations_by_event(evento_id)
+    workshops = get_workshop_vagas_info(evento_id)
+    visible, visibility_reason = get_registration_visibility(event)
+
+    total = len(registrations)
+    menores = sum(1 for row in registrations if is_minor(row["data_nascimento"]))
+    com_oficina = sum(
+        1
+        for row in registrations
+        if (row.get("oficina_nome") or "").strip() or (row.get("oficina_nome_2") or "").strip()
+    )
+
+    vagas_totais = sum(w["vagas_totais"] for w in workshops)
+    vagas_ocupadas = sum(w["vagas_ocupadas"] for w in workshops)
+    ocupacao_pct = round((vagas_ocupadas / vagas_totais) * 100, 1) if vagas_totais else 0.0
+
+    church_counts = {}
+    for row in registrations:
+        igreja = (row.get("igreja") or "").strip()
+        if not igreja:
+            igreja = "Não informada"
+        church_counts[igreja] = church_counts.get(igreja, 0) + 1
+
+    por_igreja = sorted(
+        [{"igreja": name, "total": count} for name, count in church_counts.items()],
+        key=lambda item: item["total"],
+        reverse=True,
+    )
+
+    day_counts = {}
+    for row in registrations:
+        parsed = coerce_to_datetime(row.get("data_inscricao"))
+        if not parsed:
+            continue
+        day_key = parsed.date().isoformat()
+        day_counts[day_key] = day_counts.get(day_key, 0) + 1
+
+    por_dia = [
+        {"data": day, "total": count}
+        for day, count in sorted(day_counts.items())
+    ]
+
+    workshop_chart = [
+        {
+            "oficina": w["nome"],
+            "ocupadas": w["vagas_ocupadas"],
+            "restantes": w["vagas_restantes"],
+        }
+        for w in workshops
+    ]
+
+    return {
+        "evento": event,
+        "visible": visible,
+        "visibility_reason": visibility_reason,
+        "total_inscritos": total,
+        "menores": menores,
+        "com_oficina": com_oficina,
+        "sem_oficina": max(0, total - com_oficina),
+        "vagas_totais": vagas_totais,
+        "vagas_ocupadas": vagas_ocupadas,
+        "ocupacao_pct": ocupacao_pct,
+        "workshops_total": len(workshops),
+        "por_igreja": por_igreja,
+        "por_dia": por_dia,
+        "workshops": workshops,
+        "workshop_chart": workshop_chart,
+    }
+
+
 init_db()

@@ -445,6 +445,105 @@ def _render_workshop_event_panel():
                 st.rerun()
 
 
+def render_admin_dashboard_tab():
+    """Dashboard com métricas e gráficos do evento selecionado."""
+    styles.apply_admin_dashboard_styles()
+    st.subheader("Dashboard")
+    st.caption("Visão geral de inscrições, igrejas e ocupação das oficinas.")
+
+    events = db.get_all_events()
+    if not events:
+        st.warning("Cadastre um evento para visualizar o dashboard.")
+        return
+
+    event_options = {ev["nome"]: ev["id"] for ev in events}
+    selected_event_name = st.selectbox(
+        "Evento",
+        list(event_options.keys()),
+        key="select_event_dashboard",
+    )
+    selected_event_id = event_options[selected_event_name]
+    data = db.get_event_dashboard_data(selected_event_id)
+
+    if not data:
+        st.error("Não foi possível carregar os dados do evento.")
+        return
+
+    event = data["evento"]
+    status_class = "dash-status-open" if data["visible"] else "dash-status-closed"
+    status_label = "Inscrições abertas no portal" if data["visible"] else data["visibility_reason"]
+    st.markdown(
+        f"<span class='dash-status-pill {status_class}'>{status_label}</span>",
+        unsafe_allow_html=True,
+    )
+
+    ins_ini = db.format_date_br(event["inicio_inscricoes"])
+    ins_fim = db.format_date_br(event["fim_inscricoes"])
+    ev_ini = db.format_date_br(event["data_inicio"])
+    ev_fim = db.format_date_br(event["data_fim"])
+    st.caption(f"Evento: {ev_ini} a {ev_fim} · Inscrições: {ins_ini} até {ins_fim}")
+
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    col_m1.metric("Inscritos", data["total_inscritos"])
+    col_m2.metric("Menores de 18", data["menores"])
+    col_m3.metric("Com oficina", data["com_oficina"])
+    col_m4.metric("Ocupação oficinas", f"{data['ocupacao_pct']}%")
+
+    col_s1, col_s2, col_s3 = st.columns(3)
+    col_s1.metric("Sem oficina", data["sem_oficina"])
+    col_s2.metric("Vagas oficinas", f"{data['vagas_ocupadas']}/{data['vagas_totais']}")
+    col_s3.metric("Oficinas ativas", data["workshops_total"])
+
+    st.write("")
+
+    col_chart1, col_chart2 = st.columns(2)
+
+    with col_chart1:
+        with st.container(border=True):
+            st.markdown("<p class='dash-section-title'>Top igrejas</p>", unsafe_allow_html=True)
+            if data["por_igreja"]:
+                top_churches = data["por_igreja"][:8]
+                df_igrejas = pd.DataFrame(top_churches).set_index("igreja")
+                st.bar_chart(df_igrejas, height=280)
+            else:
+                st.info("Ainda não há inscrições para este evento.")
+
+    with col_chart2:
+        with st.container(border=True):
+            st.markdown("<p class='dash-section-title'>Ocupação por oficina</p>", unsafe_allow_html=True)
+            if data["workshop_chart"]:
+                df_workshops = pd.DataFrame(data["workshop_chart"]).set_index("oficina")
+                st.bar_chart(df_workshops[["ocupadas", "restantes"]], height=280)
+            else:
+                st.info("Nenhuma oficina vinculada a este evento.")
+
+    with st.container(border=True):
+        st.markdown("<p class='dash-section-title'>Inscrições por dia</p>", unsafe_allow_html=True)
+        if data["por_dia"]:
+            df_dia = pd.DataFrame(data["por_dia"])
+            df_dia["data"] = pd.to_datetime(df_dia["data"])
+            df_dia = df_dia.set_index("data")
+            st.line_chart(df_dia, height=260)
+        else:
+            st.info("Sem histórico de inscrições ainda.")
+
+    if data["workshops"]:
+        with st.container(border=True):
+            st.markdown("<p class='dash-section-title'>Resumo das oficinas</p>", unsafe_allow_html=True)
+            df_resumo = pd.DataFrame(data["workshops"])[[
+                "nome", "preletor", "vagas_ocupadas", "vagas_totais", "vagas_restantes",
+            ]].copy()
+            df_resumo["ocupacao"] = df_resumo.apply(
+                lambda row: f"{round((row['vagas_ocupadas'] / row['vagas_totais']) * 100, 1)}%"
+                if row["vagas_totais"] else "0%",
+                axis=1,
+            )
+            df_resumo.columns = [
+                "Oficina", "Preletor", "Ocupadas", "Total", "Restantes", "Ocupação",
+            ]
+            st.dataframe(df_resumo, use_container_width=True, hide_index=True)
+
+
 def render_event_registration_header(event):
     """Exibe banner, título e datas do evento nas telas de inscrição."""
     if styles.resolve_banner_path(event["banner_path"]):
@@ -869,7 +968,18 @@ elif st.session_state.page == 'admin':
     st.markdown("<h1 style='color:#FF5733;'>🛠️ Painel Administrativo</h1>", unsafe_allow_html=True)
     st.markdown("Gerencie eventos, oficinas e visualize relatórios de inscritos.")
     
-    tab_eventos, tab_oficinas, tab_inscricoes = st.tabs(["📅 Eventos", "🎯 Oficinas", "👥 Inscrições"])
+    tab_dashboard, tab_eventos, tab_oficinas, tab_inscricoes = st.tabs([
+        "📊 Dashboard",
+        "📅 Eventos",
+        "🎯 Oficinas",
+        "👥 Inscrições",
+    ])
+
+    # ----------------------------------------------------
+    # TAB: DASHBOARD
+    # ----------------------------------------------------
+    with tab_dashboard:
+        render_admin_dashboard_tab()
     
     # ----------------------------------------------------
     # TAB: EVENTOS
