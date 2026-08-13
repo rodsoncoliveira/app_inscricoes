@@ -409,6 +409,72 @@ def apply_global_styles():
         border-radius: 12px;
         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
     }}
+
+    .whatsapp-cta-card {{
+        background: linear-gradient(135deg, #0b6e59 0%, #128c7e 45%, #25d366 100%);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 18px;
+        padding: 1.35rem 1.1rem;
+        margin: 1.35rem 0 0.75rem 0;
+        text-align: center;
+        box-shadow: 0 14px 28px rgba(37, 211, 102, 0.28);
+    }}
+
+    .whatsapp-cta-card h4 {{
+        color: #ffffff;
+        margin: 0 0 0.55rem 0;
+        font-size: 1.2rem;
+        font-weight: 800;
+        letter-spacing: -0.2px;
+    }}
+
+    .whatsapp-cta-card p {{
+        color: #ecfdf3;
+        margin: 0 0 1rem 0;
+        font-size: 0.95rem;
+        line-height: 1.45;
+    }}
+
+    .whatsapp-cta-button {{
+        display: inline-block;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        background: #ffffff;
+        color: #0b6e59 !important;
+        font-weight: 800;
+        font-size: 1.05rem;
+        text-decoration: none !important;
+        padding: 0.95rem 1rem;
+        border-radius: 12px;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }}
+
+    .whatsapp-cta-button:hover {{
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+    }}
+
+    @media (max-width: 768px) {{
+        .whatsapp-cta-card {{
+            padding: 1.15rem 0.95rem;
+            margin-top: 1.1rem;
+        }}
+
+        .whatsapp-cta-card h4 {{
+            font-size: 1.08rem;
+        }}
+
+        .whatsapp-cta-button {{
+            font-size: 1rem;
+            min-height: 48px;
+            line-height: 1.2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }}
+    }}
     </style>
     """
     st.markdown(global_css, unsafe_allow_html=True)
@@ -594,9 +660,23 @@ def render_registration_summary(summary):
     st.markdown(summary_html, unsafe_allow_html=True)
 
 
-def render_whatsapp_group_cta(group_url):
+def render_whatsapp_group_cta(group_url, highlighted=True):
     """Botão para entrar no grupo oficial do evento no WhatsApp."""
     if not group_url:
+        return
+
+    safe_url = html.escape(group_url, quote=True)
+    if highlighted:
+        cta_html = f"""
+        <div class="whatsapp-cta-card">
+            <h4>📱 Entre no Grupo do WhatsApp do Congresso</h4>
+            <p>Não perca avisos, novidades e informações importantes. Toque no botão abaixo para entrar.</p>
+            <a class="whatsapp-cta-button" href="{safe_url}" target="_blank" rel="noopener noreferrer">
+                Entrar no Grupo do WhatsApp
+            </a>
+        </div>
+        """
+        st.markdown(cta_html, unsafe_allow_html=True)
         return
 
     st.markdown("---")
@@ -606,7 +686,7 @@ def render_whatsapp_group_cta(group_url):
         "Você precisa tocar no botão e confirmar a entrada no app."
     )
     st.link_button(
-        "Entrar no grupo do WhatsApp",
+        "Entrar no Grupo do WhatsApp",
         group_url,
         use_container_width=True,
         type="primary",

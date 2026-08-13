@@ -231,6 +231,12 @@ elif st.session_state.page == 'register':
         else:
             st.markdown("### 📝 Formulário de Inscrição")
 
+            nome = st.text_input(
+                "Nome Completo *",
+                placeholder="Digite seu nome completo",
+                key=f"register_nome_{event['id']}",
+            )
+
             data_nascimento = st.date_input(
                 "Data de Nascimento *",
                 value=date(2000, 1, 1),
@@ -244,7 +250,6 @@ elif st.session_state.page == 'register':
                 st.warning("Participante menor de 18 anos: nome e telefone do responsável são obrigatórios.")
 
             with st.form(key="form_inscricao"):
-                nome = st.text_input("Nome Completo *", placeholder="Digite seu nome completo")
                 whatsapp = st.text_input("WhatsApp / Celular *", placeholder="(00) 90000-0000")
                 igreja = st.text_input("Igreja / Congregação *", placeholder="Ex: Comunidade Batista Hope")
 
@@ -367,8 +372,6 @@ elif st.session_state.page == 'choose_workshops':
             pending["celebration_shown"] = True
             st.session_state.pending_registration = pending
 
-        render_whatsapp_group_for_event(event)
-
         workshops = db.get_workshop_vagas_info(event['id'])
         registration = db.get_registration(pending["id"])
 
@@ -403,6 +406,8 @@ elif st.session_state.page == 'choose_workshops':
                 selected_label_1 = st.selectbox("Oficina 1 (opcional)", options_labels_1, index=0)
                 selected_label_2 = st.selectbox("Oficina 2 (opcional)", options_labels_2, index=0)
                 submit_workshops = st.form_submit_button("Confirmar Oficinas", use_container_width=True)
+
+            render_whatsapp_group_for_event(event)
 
             if submit_workshops:
                 chosen_workshop_1 = options_dict_1[selected_label_1]
