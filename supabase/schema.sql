@@ -18,10 +18,18 @@ CREATE TABLE IF NOT EXISTS eventos (
 
 CREATE TABLE IF NOT EXISTS oficinas (
     id SERIAL PRIMARY KEY,
-    evento_id INTEGER NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
     nome TEXT NOT NULL,
     preletor TEXT NOT NULL,
-    vagas INTEGER NOT NULL
+    descricao TEXT,
+    ativo INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS evento_oficinas (
+    evento_id INTEGER NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+    oficina_id INTEGER NOT NULL REFERENCES oficinas(id) ON DELETE CASCADE,
+    vagas INTEGER NOT NULL,
+    preletor TEXT,
+    PRIMARY KEY (evento_id, oficina_id)
 );
 
 CREATE TABLE IF NOT EXISTS inscricoes (
@@ -40,4 +48,5 @@ CREATE TABLE IF NOT EXISTS inscricoes (
 
 CREATE INDEX IF NOT EXISTS idx_inscricoes_evento_id ON inscricoes(evento_id);
 CREATE INDEX IF NOT EXISTS idx_inscricoes_evento_nascimento ON inscricoes(evento_id, data_nascimento);
-CREATE INDEX IF NOT EXISTS idx_oficinas_evento_id ON oficinas(evento_id);
+CREATE INDEX IF NOT EXISTS idx_evento_oficinas_evento ON evento_oficinas(evento_id);
+CREATE INDEX IF NOT EXISTS idx_evento_oficinas_oficina ON evento_oficinas(oficina_id);

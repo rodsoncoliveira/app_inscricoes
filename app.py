@@ -22,6 +22,8 @@ if 'editing_event_id' not in st.session_state:
     st.session_state.editing_event_id = None
 if 'editing_workshop_id' not in st.session_state:
     st.session_state.editing_workshop_id = None
+if 'editing_event_workshop_link' not in st.session_state:
+    st.session_state.editing_event_workshop_link = None
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 if 'registration_summary' not in st.session_state:
@@ -804,87 +806,238 @@ elif st.session_state.page == 'admin':
     # TAB: OFICINAS
     # ----------------------------------------------------
     with tab_oficinas:
-        st.subheader("Configurar Oficinas")
-        
-        events = db.get_all_events()
-        if len(events) == 0:
-            st.warning("Cadastre um evento primeiro para poder adicionar oficinas.")
-        else:
-            # Verificar se está editando alguma oficina
-            if st.session_state.editing_workshop_id is not None:
-                w_to_edit = db.get_workshop(st.session_state.editing_workshop_id)
-                if w_to_edit:
-                    st.write(f"### ✏️ Editar Oficina: {w_to_edit['nome']}")
-                    
-                    with st.form(key="form_edit_workshop"):
-                        edit_nome_oficina = st.text_input("Nome da Oficina", value=w_to_edit['nome'])
-                        edit_preletor = st.text_input("Preletor / Responsável", value=w_to_edit['preletor'])
-                        edit_vagas = st.number_input("Quantidade de Vagas", min_value=1, value=int(w_to_edit['vagas']), step=1)
-                        
-                        col_btn_w1, col_btn_w2 = st.columns(2)
-                        btn_save_edit_w = col_btn_w1.form_submit_button("Salvar Alterações")
-                        btn_cancel_edit_w = col_btn_w2.form_submit_button("Cancelar")
-                        
-                    if btn_save_edit_w:
-                        if not edit_nome_oficina or not edit_preletor:
-                            st.error("Preencha todos os campos da oficina.")
-                        else:
-                            db.update_workshop(w_to_edit['id'], edit_nome_oficina, edit_preletor, int(edit_vagas))
-                            st.success("Oficina atualizada com sucesso!")
-                            st.session_state.editing_workshop_id = None
-                            st.rerun()
-                            
-                    if btn_cancel_edit_w:
+        st.subheader("Catálogo de Oficinas")
+        st.caption("Cadastre oficinas reutilizáveis e vincule-as a um ou mais eventos.")
+
+        if st.session_state.editing_workshop_id is not None:
+            w_to_edit = db.get_workshop(st.session_state.editing_workshop_id)
+            if w_to_edit:
+                st.write(f"### ✏️ Editar Oficina: {w_to_edit['nome']}")
+                linked_events = db.get_workshop_event_links(w_to_edit["id"])
+                if linked_events:
+                    event_names = ", ".join(item["nome"] for item in linked_events)
+                    st.caption(f"Vinculada a: {event_names}")
+
+                with st.form(key="form_edit_workshop"):
+                    edit_nome_oficina = st.text_input("Nome da Oficina", value=w_to_edit["nome"])
+                    edit_preletor = st.text_input("Preletor / Responsável", value=w_to_edit["preletor"])
+                    edit_descricao = st.text_area(
+                        "Descrição (opcional)",
+                        value=w_to_edit.get("descricao") or "",
+                    )
+
+                    col_btn_w1, col_btn_w2 = st.columns(2)
+                    btn_save_edit_w = col_btn_w1.form_submit_button("Salvar Alterações")
+                    btn_cancel_edit_w = col_btn_w2.form_submit_button("Cancelar")
+
+                if btn_save_edit_w:
+                    if not edit_nome_oficina or not edit_preletor:
+                        st.error("Preencha nome e preletor da oficina.")
+                    else:
+                        db.update_workshop(
+                            w_to_edit["id"],
+                            edit_nome_oficina,
+                            edit_preletor,
+                            edit_descricao.strip() or None,
+                        )
+                        st.success("Oficina atualizada no catálogo!")
                         st.session_state.editing_workshop_id = None
                         st.rerun()
-                else:
+
+                if btn_cancel_edit_w:
                     st.session_state.editing_workshop_id = None
                     st.rerun()
             else:
-                event_options = {ev['nome']: ev['id'] for ev in events}
-                selected_event_name = st.selectbox("Selecione o Evento para a Oficina:", list(event_options.keys()))
-                selected_event_id = event_options[selected_event_name]
-                
-                with st.form(key="form_create_workshop"):
+                st.session_state.editing_workshop_id = None
+                st.rerun()
+        else:
+            with st.expander("➕ Adicionar Oficina ao Catálogo"):
+                with st.form(key="form_create_workshop_catalog"):
                     nome_oficina = st.text_input("Nome da Oficina")
                     preletor = st.text_input("Preletor / Responsável")
-                    vagas = st.number_input("Quantidade de Vagas", min_value=1, value=30, step=1)
-                    
-                    btn_salvar_oficina = st.form_submit_button("Salvar Oficina")
-                    
-                if btn_salvar_oficina:
+                    descricao = st.text_area("Descrição (opcional)")
+                    btn_salvar_catalogo = st.form_submit_button("Salvar no Catálogo")
+
+                if btn_salvar_catalogo:
                     if not nome_oficina or not preletor:
-                        st.error("Preencha todos os campos da oficina.")
+                        st.error("Preencha nome e preletor da oficina.")
                     else:
-                        db.create_workshop(selected_event_id, nome_oficina, preletor, int(vagas))
-                        st.success("Oficina cadastrada com sucesso!")
+                        db.create_workshop_catalog(
+                            nome_oficina,
+                            preletor,
+                            descricao.strip() or None,
+                        )
+                        st.success("Oficina adicionada ao catálogo!")
                         st.rerun()
-                        
-                # Listar oficinas do evento selecionado
-                st.write(f"### Oficinas de: {selected_event_name}")
-                workshops_info = db.get_workshop_vagas_info(selected_event_id)
-                
-                if len(workshops_info) == 0:
-                    st.info("Nenhuma oficina cadastrada para este evento.")
+
+            catalog_workshops = db.get_all_workshops()
+            st.write("### Oficinas Cadastradas")
+            if len(catalog_workshops) == 0:
+                st.info("Nenhuma oficina no catálogo ainda.")
+            else:
+                for w in catalog_workshops:
+                    linked_events = db.get_workshop_event_links(w["id"])
+                    if linked_events:
+                        events_label = ", ".join(item["nome"] for item in linked_events)
+                        extra_info = f"Vinculada a: {events_label}"
+                    else:
+                        extra_info = "Sem vínculo com eventos"
+
+                    col_info, col_act1, col_act2 = st.columns([3, 1, 1])
+                    col_info.markdown(f"**{w['nome']}** ({w['preletor']}) — *{extra_info}*")
+
+                    if col_act1.button("Editar", key=f"edit_catalog_w_{w['id']}"):
+                        st.session_state.editing_workshop_id = w["id"]
+                        st.rerun()
+
+                    if col_act2.button("Excluir", key=f"del_catalog_w_{w['id']}"):
+                        if linked_events:
+                            st.error("Desvincule a oficina dos eventos antes de excluir do catálogo.")
+                        else:
+                            db.delete_workshop(w["id"])
+                            st.success(f"Oficina '{w['nome']}' removida do catálogo!")
+                            st.rerun()
+
+        st.markdown("---")
+        st.subheader("Oficinas por Evento")
+
+        events = db.get_all_events()
+        if len(events) == 0:
+            st.warning("Cadastre um evento primeiro para vincular oficinas.")
+        else:
+            event_options = {ev["nome"]: ev["id"] for ev in events}
+            selected_event_name = st.selectbox(
+                "Selecione o Evento:",
+                list(event_options.keys()),
+                key="select_event_workshops",
+            )
+            selected_event_id = event_options[selected_event_name]
+
+            link_key = st.session_state.editing_event_workshop_link
+            if link_key and link_key.get("evento_id") == selected_event_id:
+                link = db.get_workshop_event_link(selected_event_id, link_key["oficina_id"])
+                if link:
+                    st.write(f"### ✏️ Configurar Oficina no Evento: {link['nome']}")
+                    with st.form(key="form_edit_event_workshop_link"):
+                        edit_vagas = st.number_input(
+                            "Vagas neste evento",
+                            min_value=1,
+                            value=int(link["vagas"]),
+                            step=1,
+                        )
+                        default_preletor = link.get("preletor_evento") or link.get("preletor_catalogo") or ""
+                        edit_preletor_evento = st.text_input(
+                            "Preletor neste evento (opcional)",
+                            value=default_preletor,
+                            help="Deixe em branco para usar o preletor padrão do catálogo.",
+                        )
+                        col_link1, col_link2 = st.columns(2)
+                        btn_save_link = col_link1.form_submit_button("Salvar Configuração")
+                        btn_cancel_link = col_link2.form_submit_button("Cancelar")
+
+                    if btn_save_link:
+                        db.update_event_workshop_link(
+                            selected_event_id,
+                            link_key["oficina_id"],
+                            int(edit_vagas),
+                            edit_preletor_evento.strip() or None,
+                        )
+                        st.success("Configuração da oficina no evento atualizada!")
+                        st.session_state.editing_event_workshop_link = None
+                        st.rerun()
+
+                    if btn_cancel_link:
+                        st.session_state.editing_event_workshop_link = None
+                        st.rerun()
                 else:
-                    # Mostrar DataFrame para visão geral
+                    st.session_state.editing_event_workshop_link = None
+                    st.rerun()
+            else:
+                workshops_info = db.get_workshop_vagas_info(selected_event_id)
+                linked_ids = {w["id"] for w in workshops_info}
+                available_workshops = [
+                    w for w in db.get_all_workshops() if w["id"] not in linked_ids
+                ]
+
+                if available_workshops:
+                    with st.expander("🔗 Vincular Oficina Existente ao Evento"):
+                        with st.form(key="form_link_workshop"):
+                            workshop_options = {
+                                f"{w['nome']} ({w['preletor']})": w["id"] for w in available_workshops
+                            }
+                            selected_workshop_label = st.selectbox(
+                                "Oficina do catálogo",
+                                list(workshop_options.keys()),
+                            )
+                            link_vagas = st.number_input("Vagas neste evento", min_value=1, value=30, step=1)
+                            link_preletor = st.text_input(
+                                "Preletor neste evento (opcional)",
+                                placeholder="Usa o preletor do catálogo se vazio",
+                            )
+                            btn_vincular = st.form_submit_button("Vincular ao Evento")
+
+                        if btn_vincular:
+                            db.link_workshop_to_event(
+                                selected_event_id,
+                                workshop_options[selected_workshop_label],
+                                int(link_vagas),
+                                link_preletor.strip() or None,
+                            )
+                            st.success("Oficina vinculada ao evento!")
+                            st.rerun()
+                else:
+                    st.info("Todas as oficinas do catálogo já estão vinculadas a este evento.")
+
+                with st.expander("➕ Criar Nova Oficina e Vincular"):
+                    with st.form(key="form_create_workshop_for_event"):
+                        nome_oficina_evento = st.text_input("Nome da Oficina")
+                        preletor_evento = st.text_input("Preletor / Responsável")
+                        vagas_evento = st.number_input("Vagas neste evento", min_value=1, value=30, step=1)
+                        btn_salvar_evento = st.form_submit_button("Criar e Vincular")
+
+                    if btn_salvar_evento:
+                        if not nome_oficina_evento or not preletor_evento:
+                            st.error("Preencha nome e preletor da oficina.")
+                        else:
+                            db.create_workshop(
+                                selected_event_id,
+                                nome_oficina_evento,
+                                preletor_evento,
+                                int(vagas_evento),
+                            )
+                            st.success("Oficina criada e vinculada ao evento!")
+                            st.rerun()
+
+                st.write(f"### Oficinas de: {selected_event_name}")
+                if len(workshops_info) == 0:
+                    st.info("Nenhuma oficina vinculada a este evento.")
+                else:
                     df_workshops = pd.DataFrame(workshops_info)
-                    df_workshops.columns = ["ID", "Nome da Oficina", "Preletor", "Vagas Totais", "Vagas Ocupadas", "Vagas Restantes"]
+                    df_workshops = df_workshops[[
+                        "id", "nome", "preletor", "vagas_totais", "vagas_ocupadas", "vagas_restantes",
+                    ]]
+                    df_workshops.columns = [
+                        "ID", "Nome da Oficina", "Preletor", "Vagas Totais", "Vagas Ocupadas", "Vagas Restantes",
+                    ]
                     st.dataframe(df_workshops, use_container_width=True)
-                    
-                    # Ações de linha para gerenciar individualmente
-                    st.write("#### Gerenciar Oficinas")
+
+                    st.write("#### Gerenciar Vínculos")
                     for w in workshops_info:
                         col_info, col_act1, col_act2 = st.columns([3, 1, 1])
-                        col_info.markdown(f"**{w['nome']}** ({w['preletor']}) — *{w['vagas_restantes']} vagas rest.*")
-                        
-                        if col_act1.button("Editar", key=f"edit_w_{w['id']}"):
-                            st.session_state.editing_workshop_id = w['id']
+                        col_info.markdown(
+                            f"**{w['nome']}** ({w['preletor']}) — *{w['vagas_restantes']} vagas rest.*"
+                        )
+
+                        if col_act1.button("Configurar", key=f"cfg_w_{selected_event_id}_{w['id']}"):
+                            st.session_state.editing_event_workshop_link = {
+                                "evento_id": selected_event_id,
+                                "oficina_id": w["id"],
+                            }
                             st.rerun()
-                            
-                        if col_act2.button("Excluir", key=f"del_w_{w['id']}"):
-                            db.delete_workshop(w['id'])
-                            st.success(f"Oficina '{w['nome']}' excluída com sucesso!")
+
+                        if col_act2.button("Desvincular", key=f"unlink_w_{selected_event_id}_{w['id']}"):
+                            db.unlink_workshop_from_event(selected_event_id, w["id"])
+                            st.success(f"Oficina '{w['nome']}' desvinculada do evento!")
                             st.rerun()
 
     # ----------------------------------------------------

@@ -227,10 +227,19 @@ def _init_postgres():
         """
         CREATE TABLE IF NOT EXISTS oficinas (
             id SERIAL PRIMARY KEY,
-            evento_id INTEGER NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
             nome TEXT NOT NULL,
             preletor TEXT NOT NULL,
-            vagas INTEGER NOT NULL
+            descricao TEXT,
+            ativo INTEGER DEFAULT 1
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS evento_oficinas (
+            evento_id INTEGER NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+            oficina_id INTEGER NOT NULL REFERENCES oficinas(id) ON DELETE CASCADE,
+            vagas INTEGER NOT NULL,
+            preletor TEXT,
+            PRIMARY KEY (evento_id, oficina_id)
         )
         """,
         """
@@ -250,7 +259,8 @@ def _init_postgres():
         """,
         "CREATE INDEX IF NOT EXISTS idx_inscricoes_evento_id ON inscricoes(evento_id)",
         "CREATE INDEX IF NOT EXISTS idx_inscricoes_evento_nascimento ON inscricoes(evento_id, data_nascimento)",
-        "CREATE INDEX IF NOT EXISTS idx_oficinas_evento_id ON oficinas(evento_id)",
+        "CREATE INDEX IF NOT EXISTS idx_evento_oficinas_evento ON evento_oficinas(evento_id)",
+        "CREATE INDEX IF NOT EXISTS idx_evento_oficinas_oficina ON evento_oficinas(oficina_id)",
     ]
 
     with get_connection() as conn:
@@ -258,6 +268,7 @@ def _init_postgres():
         for statement in ddl_statements:
             cursor.execute(statement)
         _ensure_eventos_columns(cursor)
+        _ensure_workshops_schema(cursor)
 
 
 def _ensure_eventos_columns(cursor):
@@ -270,6 +281,104 @@ def _ensure_eventos_columns(cursor):
     columns = [row["name"] for row in cursor.fetchall()]
     if "whatsapp_grupo_url" not in columns:
         cursor.execute("ALTER TABLE eventos ADD COLUMN whatsapp_grupo_url TEXT;")
+
+
+def _table_has_column(cursor, table_name, column_name):
+    if uses_postgres():
+        _execute(
+            cursor,
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = %s AND column_name = %s
+            """,
+            (table_name, column_name),
+        )
+        return cursor.fetchone() is not None
+
+    _execute(cursor, f"PRAGMA table_info({table_name});")
+    return any(row["name"] == column_name for row in cursor.fetchall())
+
+
+def _ensure_workshops_schema(cursor):
+    """Migra oficinas acopladas ao evento para catálogo + evento_oficinas."""
+    if uses_postgres():
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS evento_oficinas (
+                evento_id INTEGER NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+                oficina_id INTEGER NOT NULL REFERENCES oficinas(id) ON DELETE CASCADE,
+                vagas INTEGER NOT NULL,
+                preletor TEXT,
+                PRIMARY KEY (evento_id, oficina_id)
+            )
+            """
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_evento_oficinas_evento ON evento_oficinas(evento_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_evento_oficinas_oficina ON evento_oficinas(oficina_id)")
+        cursor.execute("ALTER TABLE oficinas ADD COLUMN IF NOT EXISTS descricao TEXT")
+        cursor.execute("ALTER TABLE oficinas ADD COLUMN IF NOT EXISTS ativo INTEGER DEFAULT 1")
+
+        if _table_has_column(cursor, "oficinas", "evento_id"):
+            cursor.execute(
+                """
+                INSERT INTO evento_oficinas (evento_id, oficina_id, vagas)
+                SELECT evento_id, id, vagas
+                FROM oficinas
+                WHERE evento_id IS NOT NULL
+                ON CONFLICT (evento_id, oficina_id) DO NOTHING
+                """
+            )
+            cursor.execute("ALTER TABLE oficinas DROP COLUMN evento_id")
+            cursor.execute("ALTER TABLE oficinas DROP COLUMN vagas")
+        return
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS evento_oficinas (
+            evento_id INTEGER NOT NULL,
+            oficina_id INTEGER NOT NULL,
+            vagas INTEGER NOT NULL,
+            preletor TEXT,
+            PRIMARY KEY (evento_id, oficina_id),
+            FOREIGN KEY (evento_id) REFERENCES eventos(id) ON DELETE CASCADE,
+            FOREIGN KEY (oficina_id) REFERENCES oficinas(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    if not _table_has_column(cursor, "oficinas", "evento_id"):
+        if not _table_has_column(cursor, "oficinas", "descricao"):
+            cursor.execute("ALTER TABLE oficinas ADD COLUMN descricao TEXT;")
+        if not _table_has_column(cursor, "oficinas", "ativo"):
+            cursor.execute("ALTER TABLE oficinas ADD COLUMN ativo INTEGER DEFAULT 1;")
+        return
+
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO evento_oficinas (evento_id, oficina_id, vagas)
+        SELECT evento_id, id, vagas FROM oficinas WHERE evento_id IS NOT NULL
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS oficinas_catalog (
+            id INTEGER PRIMARY KEY,
+            nome TEXT NOT NULL,
+            preletor TEXT NOT NULL,
+            descricao TEXT,
+            ativo INTEGER DEFAULT 1
+        )
+        """
+    )
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO oficinas_catalog (id, nome, preletor, ativo)
+        SELECT id, nome, preletor, 1 FROM oficinas
+        """
+    )
+    cursor.execute("DROP TABLE oficinas")
+    cursor.execute("ALTER TABLE oficinas_catalog RENAME TO oficinas")
 
 
 def _init_sqlite():
@@ -306,11 +415,24 @@ def _init_sqlite():
             """
             CREATE TABLE IF NOT EXISTS oficinas (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                evento_id INTEGER NOT NULL,
                 nome TEXT NOT NULL,
                 preletor TEXT NOT NULL,
+                descricao TEXT,
+                ativo INTEGER DEFAULT 1
+            )
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS evento_oficinas (
+                evento_id INTEGER NOT NULL,
+                oficina_id INTEGER NOT NULL,
                 vagas INTEGER NOT NULL,
-                FOREIGN KEY (evento_id) REFERENCES eventos(id) ON DELETE CASCADE
+                preletor TEXT,
+                PRIMARY KEY (evento_id, oficina_id),
+                FOREIGN KEY (evento_id) REFERENCES eventos(id) ON DELETE CASCADE,
+                FOREIGN KEY (oficina_id) REFERENCES oficinas(id) ON DELETE CASCADE
             )
             """
         )
@@ -353,6 +475,7 @@ def _init_sqlite():
                 pass
 
         _ensure_eventos_columns(cursor)
+        _ensure_workshops_schema(cursor)
 
 
 def normalize_whatsapp_group_url(url):
@@ -553,27 +676,41 @@ def delete_event(event_id):
 
 # --- OPERAÇÕES DE OFICINAS ---
 
-def create_workshop(evento_id, nome, preletor, vagas):
+def create_workshop_catalog(nome, preletor, descricao=None, ativo=1):
     with get_connection() as conn:
         cursor = conn.cursor()
         if uses_postgres():
             _execute(
                 cursor,
                 """
-                INSERT INTO oficinas (evento_id, nome, preletor, vagas)
+                INSERT INTO oficinas (nome, preletor, descricao, ativo)
                 VALUES (%s, %s, %s, %s)
                 RETURNING id
                 """,
-                (evento_id, nome, preletor, vagas),
+                (nome, preletor, descricao, ativo),
             )
             return _fetchone_dict(cursor)["id"]
 
         _execute(
             cursor,
-            "INSERT INTO oficinas (evento_id, nome, preletor, vagas) VALUES (%s, %s, %s, %s)",
-            (evento_id, nome, preletor, vagas),
+            "INSERT INTO oficinas (nome, preletor, descricao, ativo) VALUES (%s, %s, %s, %s)",
+            (nome, preletor, descricao, ativo),
         )
         return cursor.lastrowid
+
+
+def create_workshop(evento_id, nome, preletor, vagas):
+    """Cria oficina no catálogo e vincula ao evento."""
+    workshop_id = create_workshop_catalog(nome, preletor)
+    link_workshop_to_event(evento_id, workshop_id, vagas)
+    return workshop_id
+
+
+def get_all_workshops():
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        _execute(cursor, "SELECT * FROM oficinas ORDER BY nome ASC")
+        return _fetchall_dicts(cursor)
 
 
 def get_workshops_by_event(evento_id):
@@ -581,7 +718,20 @@ def get_workshops_by_event(evento_id):
         cursor = conn.cursor()
         _execute(
             cursor,
-            "SELECT * FROM oficinas WHERE evento_id = %s ORDER BY nome ASC",
+            """
+            SELECT
+                o.id,
+                o.nome,
+                COALESCE(eo.preletor, o.preletor) AS preletor,
+                o.descricao,
+                o.ativo,
+                eo.vagas,
+                eo.evento_id
+            FROM evento_oficinas eo
+            JOIN oficinas o ON o.id = eo.oficina_id
+            WHERE eo.evento_id = %s
+            ORDER BY o.nome ASC
+            """,
             (evento_id,),
         )
         return _fetchall_dicts(cursor)
@@ -594,20 +744,105 @@ def get_workshop(workshop_id):
         return _fetchone_dict(cursor)
 
 
+def get_workshop_event_link(evento_id, workshop_id):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        _execute(
+            cursor,
+            """
+            SELECT
+                eo.evento_id,
+                eo.oficina_id,
+                eo.vagas,
+                eo.preletor AS preletor_evento,
+                o.nome,
+                o.preletor AS preletor_catalogo
+            FROM evento_oficinas eo
+            JOIN oficinas o ON o.id = eo.oficina_id
+            WHERE eo.evento_id = %s AND eo.oficina_id = %s
+            """,
+            (evento_id, workshop_id),
+        )
+        return _fetchone_dict(cursor)
+
+
+def link_workshop_to_event(evento_id, oficina_id, vagas, preletor=None):
+    preletor = preletor.strip() if preletor else None
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        _execute(
+            cursor,
+            """
+            INSERT INTO evento_oficinas (evento_id, oficina_id, vagas, preletor)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (evento_id, oficina_id) DO UPDATE
+            SET vagas = EXCLUDED.vagas,
+                preletor = EXCLUDED.preletor
+            """,
+            (evento_id, oficina_id, vagas, preletor),
+        )
+
+
+def unlink_workshop_from_event(evento_id, oficina_id):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        _execute(
+            cursor,
+            "DELETE FROM evento_oficinas WHERE evento_id = %s AND oficina_id = %s",
+            (evento_id, oficina_id),
+        )
+
+
 def delete_workshop(workshop_id):
     with get_connection() as conn:
         cursor = conn.cursor()
         _execute(cursor, "DELETE FROM oficinas WHERE id = %s", (workshop_id,))
 
 
-def update_workshop(workshop_id, nome, preletor, vagas):
+def update_workshop(workshop_id, nome, preletor, descricao=None, ativo=1):
     with get_connection() as conn:
         cursor = conn.cursor()
         _execute(
             cursor,
-            "UPDATE oficinas SET nome = %s, preletor = %s, vagas = %s WHERE id = %s",
-            (nome, preletor, vagas, workshop_id),
+            """
+            UPDATE oficinas
+            SET nome = %s, preletor = %s, descricao = %s, ativo = %s
+            WHERE id = %s
+            """,
+            (nome, preletor, descricao, ativo, workshop_id),
         )
+
+
+def update_event_workshop_link(evento_id, oficina_id, vagas, preletor=None):
+    preletor = preletor.strip() if preletor else None
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        _execute(
+            cursor,
+            """
+            UPDATE evento_oficinas
+            SET vagas = %s, preletor = %s
+            WHERE evento_id = %s AND oficina_id = %s
+            """,
+            (vagas, preletor, evento_id, oficina_id),
+        )
+
+
+def get_workshop_event_links(oficina_id):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        _execute(
+            cursor,
+            """
+            SELECT e.id, e.nome, eo.vagas
+            FROM evento_oficinas eo
+            JOIN eventos e ON e.id = eo.evento_id
+            WHERE eo.oficina_id = %s
+            ORDER BY e.data_inicio DESC
+            """,
+            (oficina_id,),
+        )
+        return _fetchall_dicts(cursor)
 
 
 def get_workshop_vagas_info(evento_id):
@@ -619,17 +854,19 @@ def get_workshop_vagas_info(evento_id):
             SELECT
                 o.id,
                 o.nome,
-                o.preletor,
-                o.vagas AS vagas_totais,
+                COALESCE(eo.preletor, o.preletor) AS preletor,
+                eo.vagas AS vagas_totais,
                 (
                     SELECT COUNT(*) FROM inscricoes i
-                    WHERE i.oficina_id = o.id OR i.oficina_id_2 = o.id
+                    WHERE i.evento_id = %s
+                      AND (i.oficina_id = o.id OR i.oficina_id_2 = o.id)
                 ) AS vagas_ocupadas
-            FROM oficinas o
-            WHERE o.evento_id = %s
+            FROM evento_oficinas eo
+            JOIN oficinas o ON o.id = eo.oficina_id
+            WHERE eo.evento_id = %s
             ORDER BY o.nome ASC
             """,
-            (evento_id,),
+            (evento_id, evento_id),
         )
         rows = _fetchall_dicts(cursor)
 
@@ -715,12 +952,12 @@ def validate_guardian_fields(data_nascimento, responsavel_nome, responsavel_tele
     return True, "", None, None
 
 
-def _count_workshop_occupancy(cursor, oficina_id, exclude_registration_id=None):
+def _count_workshop_occupancy(cursor, oficina_id, evento_id, exclude_registration_id=None):
     query = """
         SELECT COUNT(*) as ocupadas FROM inscricoes
-        WHERE oficina_id = %s OR oficina_id_2 = %s
+        WHERE evento_id = %s AND (oficina_id = %s OR oficina_id_2 = %s)
     """
-    params = [oficina_id, oficina_id]
+    params = [evento_id, oficina_id, oficina_id]
     if exclude_registration_id:
         query += " AND id != %s"
         params.append(exclude_registration_id)
@@ -729,19 +966,41 @@ def _count_workshop_occupancy(cursor, oficina_id, exclude_registration_id=None):
     return _fetchone_dict(cursor)["ocupadas"]
 
 
-def _has_workshop_vacancy(cursor, oficina_id, exclude_registration_id=None):
-    _execute(cursor, "SELECT vagas FROM oficinas WHERE id = %s", (oficina_id,))
+def _has_workshop_vacancy(cursor, oficina_id, evento_id, exclude_registration_id=None):
+    _execute(
+        cursor,
+        "SELECT vagas FROM evento_oficinas WHERE evento_id = %s AND oficina_id = %s",
+        (evento_id, oficina_id),
+    )
     row = _fetchone_dict(cursor)
     if not row:
         return False
 
-    ocupadas = _count_workshop_occupancy(cursor, oficina_id, exclude_registration_id)
+    ocupadas = _count_workshop_occupancy(cursor, oficina_id, evento_id, exclude_registration_id)
     return ocupadas < row["vagas"]
 
 
 def _validate_workshop_selection(oficina_id, oficina_id_2):
     if oficina_id is not None and oficina_id_2 is not None and oficina_id == oficina_id_2:
         return False, "Selecione duas oficinas diferentes."
+    return True, ""
+
+
+def _validate_workshops_for_event(cursor, evento_id, oficina_id, oficina_id_2):
+    for workshop_id in (oficina_id, oficina_id_2):
+        if workshop_id is None:
+            continue
+        _execute(
+            cursor,
+            """
+            SELECT 1 FROM evento_oficinas
+            WHERE evento_id = %s AND oficina_id = %s
+            """,
+            (evento_id, workshop_id),
+        )
+        if not _fetchone_dict(cursor):
+            workshop_name = _get_workshop_name(cursor, workshop_id)
+            return False, f"A oficina '{workshop_name}' não está disponível neste evento."
     return True, ""
 
 
@@ -793,11 +1052,17 @@ def create_registration(
     with get_connection() as conn:
         cursor = conn.cursor()
 
+        event_valid, event_error = _validate_workshops_for_event(
+            cursor, evento_id, oficina_id, oficina_id_2
+        )
+        if not event_valid:
+            return False, event_error, None
+
         selected_workshop_ids = [wid for wid in (oficina_id, oficina_id_2) if wid is not None]
         for workshop_id in selected_workshop_ids:
             if workshop_id in previous_workshop_ids:
                 continue
-            if not _has_workshop_vacancy(cursor, workshop_id, exclude_registration_id=exclude_id):
+            if not _has_workshop_vacancy(cursor, workshop_id, evento_id, exclude_registration_id=exclude_id):
                 workshop_name = _get_workshop_name(cursor, workshop_id)
                 return False, f"A oficina '{workshop_name}' já está lotada! Por favor, escolha outra.", None
 
@@ -915,12 +1180,14 @@ def get_registrations_by_event(evento_id):
                 i.responsavel_telefone,
                 i.data_inscricao,
                 o1.nome AS oficina_nome,
-                o1.preletor AS oficina_preletor,
+                COALESCE(eo1.preletor, o1.preletor) AS oficina_preletor,
                 o2.nome AS oficina_nome_2,
-                o2.preletor AS oficina_preletor_2
+                COALESCE(eo2.preletor, o2.preletor) AS oficina_preletor_2
             FROM inscricoes i
             LEFT JOIN oficinas o1 ON i.oficina_id = o1.id
+            LEFT JOIN evento_oficinas eo1 ON eo1.evento_id = i.evento_id AND eo1.oficina_id = o1.id
             LEFT JOIN oficinas o2 ON i.oficina_id_2 = o2.id
+            LEFT JOIN evento_oficinas eo2 ON eo2.evento_id = i.evento_id AND eo2.oficina_id = o2.id
             WHERE i.evento_id = %s
             ORDER BY i.data_inscricao DESC
             """,
@@ -949,13 +1216,15 @@ def get_registration(registration_id):
                 i.data_inscricao,
                 e.nome AS evento_nome,
                 o1.nome AS oficina_nome,
-                o1.preletor AS oficina_preletor,
+                COALESCE(eo1.preletor, o1.preletor) AS oficina_preletor,
                 o2.nome AS oficina_nome_2,
-                o2.preletor AS oficina_preletor_2
+                COALESCE(eo2.preletor, o2.preletor) AS oficina_preletor_2
             FROM inscricoes i
             JOIN eventos e ON i.evento_id = e.id
             LEFT JOIN oficinas o1 ON i.oficina_id = o1.id
+            LEFT JOIN evento_oficinas eo1 ON eo1.evento_id = i.evento_id AND eo1.oficina_id = o1.id
             LEFT JOIN oficinas o2 ON i.oficina_id_2 = o2.id
+            LEFT JOIN evento_oficinas eo2 ON eo2.evento_id = i.evento_id AND eo2.oficina_id = o2.id
             WHERE i.id = %s
             """,
             (registration_id,),
@@ -973,12 +1242,19 @@ def update_registration_workshops(registration_id, oficina_id, oficina_id_2=None
         cursor = conn.cursor()
         _execute(
             cursor,
-            "SELECT oficina_id, oficina_id_2 FROM inscricoes WHERE id = %s",
+            "SELECT evento_id, oficina_id, oficina_id_2 FROM inscricoes WHERE id = %s",
             (registration_id,),
         )
         row = _fetchone_dict(cursor)
         if not row:
             return False, "Inscrição não encontrada."
+
+        evento_id = row["evento_id"]
+        event_valid, event_error = _validate_workshops_for_event(
+            cursor, evento_id, oficina_id, oficina_id_2
+        )
+        if not event_valid:
+            return False, event_error
 
         previous_workshop_ids = set()
         if row.get("oficina_id"):
@@ -990,7 +1266,9 @@ def update_registration_workshops(registration_id, oficina_id, oficina_id_2=None
         for workshop_id in selected_workshop_ids:
             if workshop_id in previous_workshop_ids:
                 continue
-            if not _has_workshop_vacancy(cursor, workshop_id, exclude_registration_id=registration_id):
+            if not _has_workshop_vacancy(
+                cursor, workshop_id, evento_id, exclude_registration_id=registration_id
+            ):
                 workshop_name = _get_workshop_name(cursor, workshop_id)
                 return False, f"A oficina '{workshop_name}' já está lotada! Por favor, escolha outra."
 

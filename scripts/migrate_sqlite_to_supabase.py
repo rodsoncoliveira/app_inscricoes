@@ -84,18 +84,29 @@ def main():
         for oficina in oficinas:
             pg_cur.execute(
                 """
-                INSERT INTO oficinas (evento_id, nome, preletor, vagas)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO oficinas (nome, preletor, ativo)
+                VALUES (%s, %s, 1)
                 RETURNING id
                 """,
                 (
-                    evento_id_map[oficina["evento_id"]],
                     oficina["nome"],
                     oficina["preletor"],
+                ),
+            )
+            new_oficina_id = pg_cur.fetchone()["id"]
+            oficina_id_map[oficina["id"]] = new_oficina_id
+            pg_cur.execute(
+                """
+                INSERT INTO evento_oficinas (evento_id, oficina_id, vagas)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (evento_id, oficina_id) DO NOTHING
+                """,
+                (
+                    evento_id_map[oficina["evento_id"]],
+                    new_oficina_id,
                     oficina["vagas"],
                 ),
             )
-            oficina_id_map[oficina["id"]] = pg_cur.fetchone()["id"]
 
         sqlite_cur.execute("SELECT * FROM inscricoes ORDER BY id")
         inscricoes = [dict(row) for row in sqlite_cur.fetchall()]
