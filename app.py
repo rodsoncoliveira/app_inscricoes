@@ -681,15 +681,19 @@ elif st.session_state.page == 'admin':
                 ]].copy()
                 df_display["responsavel_nome"] = df_display["responsavel_nome"].fillna("")
                 df_display["responsavel_telefone"] = df_display["responsavel_telefone"].fillna("")
+                df_display["oficina_nome"] = df_display["oficina_nome"].fillna("")
+                df_display["oficina_nome_2"] = df_display["oficina_nome_2"].fillna("")
                 df_display["data_nascimento"] = df_display["data_nascimento"].apply(db.format_date_br)
                 df_display["data_inscricao"] = df_display["data_inscricao"].apply(db.format_datetime_br)
 
                 def format_workshops(row):
                     workshops_list = []
-                    if row.get("oficina_nome"):
-                        workshops_list.append(row["oficina_nome"])
-                    if row.get("oficina_nome_2"):
-                        workshops_list.append(row["oficina_nome_2"])
+                    for col in ("oficina_nome", "oficina_nome_2"):
+                        value = row.get(col)
+                        if pd.notna(value):
+                            text = str(value).strip()
+                            if text:
+                                workshops_list.append(text)
                     return " / ".join(workshops_list)
 
                 df_display["oficinas"] = df_display.apply(format_workshops, axis=1)
