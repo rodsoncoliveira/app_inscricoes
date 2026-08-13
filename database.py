@@ -892,6 +892,80 @@ def get_registrations_by_event(evento_id):
         return _fetchall_dicts(cursor)
 
 
+def get_registration(registration_id):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        _execute(
+            cursor,
+            """
+            SELECT
+                i.id,
+                i.evento_id,
+                i.nome,
+                i.data_nascimento,
+                i.whatsapp,
+                i.igreja,
+                i.responsavel_nome,
+                i.responsavel_telefone,
+                i.oficina_id,
+                i.oficina_id_2,
+                i.data_inscricao,
+                e.nome AS evento_nome,
+                o1.nome AS oficina_nome,
+                o1.preletor AS oficina_preletor,
+                o2.nome AS oficina_nome_2,
+                o2.preletor AS oficina_preletor_2
+            FROM inscricoes i
+            JOIN eventos e ON i.evento_id = e.id
+            LEFT JOIN oficinas o1 ON i.oficina_id = o1.id
+            LEFT JOIN oficinas o2 ON i.oficina_id_2 = o2.id
+            WHERE i.id = %s
+            """,
+            (registration_id,),
+        )
+        return _fetchone_dict(cursor)
+
+
+def update_registration_workshops(registration_id, oficina_id, oficina_id_2=None):
+    """Atualiza apenas as oficinas escolhidas após a inscrição inicial."""
+    valid_selection, selection_error = _validate_workshop_selection(oficina_id, oficina_id_2)
+    if not valid_selection:
+        return False, selection_error
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        _execute(
+            cursor,
+            "SELECT oficina_id, oficina_id_2 FROM inscricoes WHERE id = %s",
+            (registration_id,),
+        )
+        row = _fetchone_dict(cursor)
+        if not row:
+            return False, "Inscrição não encontrada."
+
+        previous_workshop_ids = set()
+        if row.get("oficina_id"):
+            previous_workshop_ids.add(row["oficina_id"])
+        if row.get("oficina_id_2"):
+            previous_workshop_ids.add(row["oficina_id_2"])
+
+        selected_workshop_ids = [wid for wid in (oficina_id, oficina_id_2) if wid is not None]
+        for workshop_id in selected_workshop_ids:
+            if workshop_id in previous_workshop_ids:
+                continue
+            if not _has_workshop_vacancy(cursor, workshop_id, exclude_registration_id=registration_id):
+                workshop_name = _get_workshop_name(cursor, workshop_id)
+                return False, f"A oficina '{workshop_name}' já está lotada! Por favor, escolha outra."
+
+        _execute(
+            cursor,
+            "UPDATE inscricoes SET oficina_id = %s, oficina_id_2 = %s WHERE id = %s",
+            (oficina_id, oficina_id_2, registration_id),
+        )
+
+    return True, registration_id
+
+
 def delete_registration(registration_id):
     with get_connection() as conn:
         cursor = conn.cursor()

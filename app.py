@@ -26,6 +26,55 @@ if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 if 'registration_summary' not in st.session_state:
     st.session_state.registration_summary = None
+if 'pending_registration' not in st.session_state:
+    st.session_state.pending_registration = None
+
+def build_registration_summary(registration, action=None):
+    """Monta o resumo exibido após inscrição e escolha de oficinas."""
+    workshops_summary = []
+    if registration.get("oficina_nome"):
+        workshops_summary.append({
+            "label": "Oficina 1",
+            "nome": registration["oficina_nome"],
+            "preletor": registration.get("oficina_preletor") or "",
+        })
+    if registration.get("oficina_nome_2"):
+        workshops_summary.append({
+            "label": "Oficina 2",
+            "nome": registration["oficina_nome_2"],
+            "preletor": registration.get("oficina_preletor_2") or "",
+        })
+
+    summary = {
+        "action": action or "created",
+        "nome": registration["nome"],
+        "data_nascimento": db.format_date_br(registration["data_nascimento"]),
+        "evento": registration["evento_nome"],
+        "workshops": workshops_summary,
+        "celebration_shown": False,
+    }
+    if registration.get("responsavel_nome"):
+        summary["responsavel_nome"] = registration["responsavel_nome"]
+    if registration.get("responsavel_telefone"):
+        summary["responsavel_telefone"] = registration["responsavel_telefone"]
+    return summary
+
+def render_event_registration_header(event):
+    """Exibe banner, título e datas do evento nas telas de inscrição."""
+    if styles.resolve_banner_path(event["banner_path"]):
+        styles.render_event_banner(event["banner_path"])
+    else:
+        st.markdown(
+            f"<h1 style='color: {event['cor_primaria']}; text-align: center;'>{event['nome']}</h1>",
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+    data_ini_str = db.format_date_br(event["data_inicio"])
+    data_fim_str = db.format_date_br(event["data_fim"])
+    st.markdown(f"**Data do Evento:** {data_ini_str} a {data_fim_str}")
+    st.write(event["descricao"])
+    st.markdown("---")
 
 def get_admin_password():
     """Senha do admin via secrets (produção) ou fallback local."""
@@ -130,6 +179,7 @@ if st.session_state.page == 'home':
             if styles.render_clickable_event_card(event, data_ev, data_fim_ins):
                 st.session_state.selected_event_id = event['id']
                 st.session_state.registration_summary = None
+                st.session_state.pending_registration = None
                 st.session_state.page = 'register'
                 st.rerun()
                 
@@ -148,24 +198,14 @@ elif st.session_state.page == 'register':
     else:
         # Aplicar as cores dinâmicas do evento
         styles.apply_event_styles(event['cor_primaria'], event['cor_secundaria'])
-        
-        # Renderizar banner
-        if styles.resolve_banner_path(event['banner_path']):
-            styles.render_event_banner(event['banner_path'])
-        else:
-            st.markdown(f"<h1 style='color: {event['cor_primaria']}; text-align: center;'>{event['nome']}</h1>", unsafe_allow_html=True)
-            
-        st.write("")
-        data_ini_str = db.format_date_br(event["data_inicio"])
-        data_fim_str = db.format_date_br(event["data_fim"])
-        st.markdown(f"**Data do Evento:** {data_ini_str} a {data_fim_str}")
-        st.write(event['descricao'])
-        st.markdown("---")
+        render_event_registration_header(event)
 
         if st.session_state.registration_summary:
             summary = st.session_state.registration_summary
             if summary.get("action") == "updated":
-                st.success("✅ Inscrição atualizada com sucesso! Seus dados foram sobrescritos.")
+                st.success("✅ Inscrição atualizada com sucesso!")
+            elif summary.get("celebration_shown"):
+                st.success("✅ Inscrição concluída! Confira o resumo abaixo.")
             else:
                 st.success("🎉 Inscrição confirmada com sucesso! Nos vemos lá!")
 
@@ -178,12 +218,11 @@ elif st.session_state.page == 'register':
 
             if st.button("Voltar ao Início", key="btn_back_after_register", use_container_width=True):
                 st.session_state.registration_summary = None
+                st.session_state.pending_registration = None
                 st.session_state.page = 'home'
                 st.rerun()
         else:
             st.markdown("### 📝 Formulário de Inscrição")
-
-            workshops = db.get_workshop_vagas_info(event['id'])
 
             data_nascimento = st.date_input(
                 "Data de Nascimento *",
@@ -222,53 +261,10 @@ elif st.session_state.page == 'register':
                     placeholder="(00) 90000-0000",
                 )
 
-                chosen_workshop_1 = None
-                chosen_workshop_2 = None
-                if len(workshops) > 0:
-                    st.write("")
-                    st.markdown("#### 🎯 Escolha suas Oficinas")
-                    st.info("As oficinas são opcionais. Você pode escolher até 2 oficinas. As vagas são limitadas por oficina.")
-
-                    options_dict = {}
-                    options_labels = []
-
-                    for w in workshops:
-                        label = f"{w['nome']} — Preletor: {w['preletor']} ({w['vagas_restantes']} vagas)"
-                        if w['vagas_restantes'] <= 0:
-                            label = f"🔴 {w['nome']} — Preletor: {w['preletor']} (ESGOTADO)"
-
-                        options_dict[label] = w
-                        options_labels.append(label)
-
-                    none_option = {"Nenhuma": None}
-                    options_labels_1 = ["Nenhuma"] + options_labels
-                    options_dict_1 = {**none_option, **options_dict}
-                    selected_label_1 = st.selectbox("Oficina 1 (opcional)", options_labels_1, index=0)
-                    chosen_workshop_1 = options_dict_1[selected_label_1]
-
-                    options_labels_2 = ["Nenhuma"] + options_labels
-                    options_dict_2 = {**none_option, **options_dict}
-                    selected_label_2 = st.selectbox("Oficina 2 (opcional)", options_labels_2, index=0)
-                    chosen_workshop_2 = options_dict_2[selected_label_2]
-
                 st.write("")
                 submit_button = st.form_submit_button("Confirmar Minha Inscrição")
 
             if submit_button:
-                existing_registration = db.find_matching_registration(
-                    event['id'], nome, data_nascimento
-                )
-
-                def workshop_is_blocked(workshop, slot_field):
-                    if not workshop or workshop['vagas_restantes'] > 0:
-                        return False
-                    if not existing_registration:
-                        return True
-                    return existing_registration.get(slot_field) != workshop['id']
-
-                blocked_1 = workshop_is_blocked(chosen_workshop_1, "oficina_id")
-                blocked_2 = workshop_is_blocked(chosen_workshop_2, "oficina_id_2")
-
                 if not nome or not whatsapp or not igreja:
                     st.error("Por favor, preencha todos os campos obrigatórios (*).")
                 else:
@@ -279,27 +275,19 @@ elif st.session_state.page == 'register':
                     )
                     if not guardian_ok:
                         st.error(guardian_error)
-                    elif chosen_workshop_1 and chosen_workshop_2 and chosen_workshop_1['id'] == chosen_workshop_2['id']:
-                        st.error("Selecione duas oficinas diferentes.")
-                    elif blocked_1:
-                        st.error(f"A oficina '{chosen_workshop_1['nome']}' já está lotada! Por favor, escolha outra.")
-                    elif blocked_2:
-                        st.error(f"A oficina '{chosen_workshop_2['nome']}' já está lotada! Por favor, escolha outra.")
                     else:
-                        oficina_id = chosen_workshop_1['id'] if chosen_workshop_1 else None
-                        oficina_id_2 = chosen_workshop_2['id'] if chosen_workshop_2 else None
                         data_nasc_str = data_nascimento.isoformat()
 
                         with st.status("Salvando sua inscrição...", expanded=True) as save_status:
-                            st.write("Validando vagas e registrando seus dados...")
+                            st.write("Registrando seus dados...")
                             success, result, action = db.create_registration(
                                 evento_id=event['id'],
                                 nome=nome,
                                 data_nascimento=data_nasc_str,
                                 whatsapp=whatsapp,
                                 igreja=igreja,
-                                oficina_id=oficina_id,
-                                oficina_id_2=oficina_id_2,
+                                oficina_id=None,
+                                oficina_id_2=None,
                                 responsavel_nome=resp_nome,
                                 responsavel_telefone=resp_tel,
                             )
@@ -310,34 +298,24 @@ elif st.session_state.page == 'register':
                                 state="complete",
                                 expanded=False,
                             )
-                            workshops_summary = []
-                            if chosen_workshop_1:
-                                workshops_summary.append({
-                                    "label": "Oficina 1",
-                                    "nome": chosen_workshop_1["nome"],
-                                    "preletor": chosen_workshop_1["preletor"],
-                                })
-                            if chosen_workshop_2:
-                                workshops_summary.append({
-                                    "label": "Oficina 2",
-                                    "nome": chosen_workshop_2["nome"],
-                                    "preletor": chosen_workshop_2["preletor"],
-                                })
-
-                            summary_data = {
-                                "action": action,
-                                "nome": nome,
-                                "data_nascimento": db.format_date_br(data_nascimento),
-                                "evento": event["nome"],
-                                "workshops": workshops_summary,
-                                "celebration_shown": False,
-                            }
-                            if db.is_minor(data_nascimento):
-                                summary_data["responsavel_nome"] = resp_nome
-                                summary_data["responsavel_telefone"] = resp_tel
-
-                            st.session_state.registration_summary = summary_data
-
+                            workshops = db.get_workshop_vagas_info(event['id'])
+                            if len(workshops) > 0:
+                                st.session_state.pending_registration = {
+                                    "id": result,
+                                    "action": action,
+                                    "evento_id": event['id'],
+                                    "celebration_shown": False,
+                                }
+                                st.session_state.registration_summary = None
+                                st.session_state.page = 'choose_workshops'
+                            else:
+                                registration = db.get_registration(result)
+                                st.session_state.registration_summary = build_registration_summary(
+                                    registration,
+                                    action=action,
+                                )
+                                st.session_state.pending_registration = None
+                                st.session_state.page = 'register'
                             st.rerun()
                         else:
                             save_status.update(
@@ -348,9 +326,131 @@ elif st.session_state.page == 'register':
                             st.error(f"Erro ao realizar inscrição: {result}")
 
             if st.button("Voltar ao Início", key="btn_back_home", use_container_width=True):
+                st.session_state.pending_registration = None
                 st.session_state.page = 'home'
                 st.rerun()
             
+        render_admin_footer_access()
+        styles.render_footer()
+
+elif st.session_state.page == 'choose_workshops':
+    pending = st.session_state.pending_registration
+    if not pending:
+        st.session_state.page = 'register'
+        st.rerun()
+
+    event = db.get_event(pending["evento_id"])
+    if not event:
+        st.error("Evento não encontrado.")
+        if st.button("Voltar ao Início"):
+            st.session_state.pending_registration = None
+            st.session_state.page = 'home'
+            st.rerun()
+    else:
+        styles.apply_event_styles(event['cor_primaria'], event['cor_secundaria'])
+        render_event_registration_header(event)
+
+        if pending.get("action") == "updated":
+            st.success("✅ Inscrição atualizada com sucesso! Escolha sua oficina!!")
+        else:
+            st.success("🎉 Parabéns, inscrição realizada com sucesso. Escolha sua oficina!!")
+
+        if not pending.get("celebration_shown"):
+            st.balloons()
+            pending["celebration_shown"] = True
+            st.session_state.pending_registration = pending
+
+        workshops = db.get_workshop_vagas_info(event['id'])
+        registration = db.get_registration(pending["id"])
+
+        if len(workshops) == 0:
+            st.session_state.registration_summary = build_registration_summary(
+                registration,
+                action=pending.get("action"),
+            )
+            st.session_state.pending_registration = None
+            st.session_state.page = 'register'
+            st.rerun()
+        else:
+            st.markdown("### 🎯 Escolha suas Oficinas")
+            st.info("As oficinas são opcionais. Você pode escolher até 2 oficinas. As vagas são limitadas por oficina.")
+
+            options_dict = {}
+            options_labels = []
+            for w in workshops:
+                label = f"{w['nome']} — Preletor: {w['preletor']} ({w['vagas_restantes']} vagas)"
+                if w['vagas_restantes'] <= 0:
+                    label = f"🔴 {w['nome']} — Preletor: {w['preletor']} (ESGOTADO)"
+                options_dict[label] = w
+                options_labels.append(label)
+
+            none_option = {"Nenhuma": None}
+            options_labels_1 = ["Nenhuma"] + options_labels
+            options_dict_1 = {**none_option, **options_dict}
+            options_labels_2 = ["Nenhuma"] + options_labels
+            options_dict_2 = {**none_option, **options_dict}
+
+            with st.form(key="form_choose_workshops"):
+                selected_label_1 = st.selectbox("Oficina 1 (opcional)", options_labels_1, index=0)
+                selected_label_2 = st.selectbox("Oficina 2 (opcional)", options_labels_2, index=0)
+                submit_workshops = st.form_submit_button("Confirmar Oficinas", use_container_width=True)
+
+            if submit_workshops:
+                chosen_workshop_1 = options_dict_1[selected_label_1]
+                chosen_workshop_2 = options_dict_2[selected_label_2]
+
+                def workshop_is_blocked(workshop, slot_field):
+                    if not workshop or workshop['vagas_restantes'] > 0:
+                        return False
+                    if not registration:
+                        return True
+                    return registration.get(slot_field) != workshop['id']
+
+                blocked_1 = workshop_is_blocked(chosen_workshop_1, "oficina_id")
+                blocked_2 = workshop_is_blocked(chosen_workshop_2, "oficina_id_2")
+
+                if chosen_workshop_1 and chosen_workshop_2 and chosen_workshop_1['id'] == chosen_workshop_2['id']:
+                    st.error("Selecione duas oficinas diferentes.")
+                elif blocked_1:
+                    st.error(f"A oficina '{chosen_workshop_1['nome']}' já está lotada! Por favor, escolha outra.")
+                elif blocked_2:
+                    st.error(f"A oficina '{chosen_workshop_2['nome']}' já está lotada! Por favor, escolha outra.")
+                else:
+                    oficina_id = chosen_workshop_1['id'] if chosen_workshop_1 else None
+                    oficina_id_2 = chosen_workshop_2['id'] if chosen_workshop_2 else None
+
+                    with st.status("Salvando oficinas...", expanded=True) as save_status:
+                        st.write("Registrando suas escolhas...")
+                        success, result = db.update_registration_workshops(
+                            pending["id"],
+                            oficina_id,
+                            oficina_id_2,
+                        )
+
+                    if success:
+                        save_status.update(
+                            label="Oficinas confirmadas!",
+                            state="complete",
+                            expanded=False,
+                        )
+                        updated_registration = db.get_registration(pending["id"])
+                        summary = build_registration_summary(
+                            updated_registration,
+                            action=pending.get("action"),
+                        )
+                        summary["celebration_shown"] = True
+                        st.session_state.registration_summary = summary
+                        st.session_state.pending_registration = None
+                        st.session_state.page = 'register'
+                        st.rerun()
+                    else:
+                        save_status.update(
+                            label="Não foi possível salvar as oficinas",
+                            state="error",
+                            expanded=False,
+                        )
+                        st.error(result)
+
         render_admin_footer_access()
         styles.render_footer()
 
