@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Dados locais (não versionar inscrições reais)
+inscricoes.db
+inscricoes.db-*
+
+# Banners enviados pelo admin (gerados em produção)
+image/banner_*
+
+# SO / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
