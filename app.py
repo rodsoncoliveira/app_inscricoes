@@ -227,7 +227,7 @@ elif st.session_state.page == 'register':
                 if len(workshops) > 0:
                     st.write("")
                     st.markdown("#### 🎯 Escolha suas Oficinas")
-                    st.info("Você pode escolher até 2 oficinas. As vagas são limitadas por oficina.")
+                    st.info("As oficinas são opcionais. Você pode escolher até 2 oficinas. As vagas são limitadas por oficina.")
 
                     options_dict = {}
                     options_labels = []
@@ -240,14 +240,15 @@ elif st.session_state.page == 'register':
                         options_dict[label] = w
                         options_labels.append(label)
 
-                    selected_label_1 = st.selectbox("Oficina 1 *", options_labels)
-                    chosen_workshop_1 = options_dict[selected_label_1]
+                    none_option = {"Nenhuma": None}
+                    options_labels_1 = ["Nenhuma"] + options_labels
+                    options_dict_1 = {**none_option, **options_dict}
+                    selected_label_1 = st.selectbox("Oficina 1 (opcional)", options_labels_1, index=0)
+                    chosen_workshop_1 = options_dict_1[selected_label_1]
 
                     options_labels_2 = ["Nenhuma"] + options_labels
-                    options_dict_2 = {"Nenhuma": None}
-                    options_dict_2.update(options_dict)
-
-                    selected_label_2 = st.selectbox("Oficina 2 (opcional)", options_labels_2)
+                    options_dict_2 = {**none_option, **options_dict}
+                    selected_label_2 = st.selectbox("Oficina 2 (opcional)", options_labels_2, index=0)
                     chosen_workshop_2 = options_dict_2[selected_label_2]
 
                 st.write("")
