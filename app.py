@@ -300,7 +300,7 @@ elif st.session_state.page == 'register':
                         summary_data = {
                             "action": action,
                             "nome": nome,
-                            "data_nascimento": data_nascimento.strftime("%d/%m/%Y"),
+                            "data_nascimento": db.format_date_br(data_nascimento),
                             "evento": event["nome"],
                             "workshops": workshops_summary,
                             "celebration_shown": False,
@@ -669,6 +669,8 @@ elif st.session_state.page == 'admin':
                 ]].copy()
                 df_display["responsavel_nome"] = df_display["responsavel_nome"].fillna("")
                 df_display["responsavel_telefone"] = df_display["responsavel_telefone"].fillna("")
+                df_display["data_nascimento"] = df_display["data_nascimento"].apply(db.format_date_br)
+                df_display["data_inscricao"] = df_display["data_inscricao"].apply(db.format_datetime_br)
 
                 def format_workshops(row):
                     workshops_list = []

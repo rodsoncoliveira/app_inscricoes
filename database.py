@@ -29,6 +29,41 @@ def format_date_br(value):
     return parsed.strftime("%d/%m/%Y") if parsed else ""
 
 
+def coerce_to_datetime(value):
+    """Converte valores vindos do banco para datetime."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
+    if isinstance(value, str):
+        normalized = value.strip().replace("Z", "+00:00")
+        if " " in normalized and "T" not in normalized:
+            normalized = normalized.replace(" ", "T", 1)
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            parsed_date = coerce_to_date(normalized)
+            return datetime.combine(parsed_date, datetime.min.time()) if parsed_date else None
+    return coerce_to_datetime(str(value))
+
+
+def format_datetime_br(value):
+    """Formata data/hora para exibição em pt-BR (dd/mm/aaaa hh:mm:ss)."""
+    parsed = coerce_to_datetime(value)
+    if not parsed:
+        return ""
+    if parsed.tzinfo is not None:
+        try:
+            from zoneinfo import ZoneInfo
+
+            parsed = parsed.astimezone(ZoneInfo("America/Sao_Paulo"))
+        except Exception:
+            parsed = parsed.replace(tzinfo=None)
+    return parsed.strftime("%d/%m/%Y %H:%M:%S")
+
+
 _use_postgres = None
 
 
