@@ -59,6 +59,100 @@ def build_registration_summary(registration, action=None):
         summary["responsavel_telefone"] = registration["responsavel_telefone"]
     return summary
 
+
+def build_registrations_display_df(registrations):
+    """Prepara DataFrame de inscrições para exibição no painel admin."""
+    df_reg = pd.DataFrame(registrations)
+    df_display = df_reg[[
+        "id", "nome", "data_nascimento", "whatsapp", "igreja",
+        "responsavel_nome", "responsavel_telefone",
+        "oficina_nome", "oficina_nome_2", "data_inscricao",
+    ]].copy()
+    df_display["responsavel_nome"] = df_display["responsavel_nome"].fillna("")
+    df_display["responsavel_telefone"] = df_display["responsavel_telefone"].fillna("")
+    df_display["oficina_nome"] = df_display["oficina_nome"].fillna("")
+    df_display["oficina_nome_2"] = df_display["oficina_nome_2"].fillna("")
+    df_display["data_nascimento"] = df_display["data_nascimento"].apply(db.format_date_br)
+    df_display["data_inscricao"] = df_display["data_inscricao"].apply(db.format_datetime_br)
+
+    def format_workshops(row):
+        workshops_list = []
+        for col in ("oficina_nome", "oficina_nome_2"):
+            value = row.get(col)
+            if pd.notna(value):
+                text = str(value).strip()
+                if text:
+                    workshops_list.append(text)
+        return " / ".join(workshops_list)
+
+    df_display["oficinas"] = df_display.apply(format_workshops, axis=1)
+    df_display = df_display[[
+        "id", "nome", "data_nascimento", "whatsapp", "igreja",
+        "responsavel_nome", "responsavel_telefone", "oficinas", "data_inscricao",
+    ]]
+    df_display.columns = [
+        "ID", "Nome Completo", "Data Nascimento",
+        "WhatsApp", "Igreja", "Responsável", "Tel. Responsável",
+        "Oficinas", "Data Inscrição",
+    ]
+    return df_display
+
+
+def filter_registrations_by_name(df_display, search_text):
+    """Filtra inscrições por parte do nome (sem diferenciar acentos ou maiúsculas)."""
+    search = (search_text or "").strip()
+    if not search:
+        return df_display
+
+    needle = db.normalize_name(search)
+    if not needle:
+        return df_display
+
+    mask = df_display["Nome Completo"].astype(str).apply(
+        lambda name: needle in db.normalize_name(name)
+    )
+    return df_display[mask].copy()
+
+
+def render_registrations_admin_table(df_display, event_id):
+    """Lista inscrições com ação de exclusão em cada linha."""
+    if df_display.empty:
+        return
+
+    column_ratios = [0.45, 1.6, 0.95, 1.05, 1.05, 1, 1, 1.15, 1.15, 0.45]
+    headers = [
+        "ID", "Nome", "Nasc.", "WhatsApp", "Igreja",
+        "Resp.", "Tel. Resp.", "Oficinas", "Inscrito em", "",
+    ]
+
+    header_cols = st.columns(column_ratios)
+    for col, title in zip(header_cols, headers):
+        col.markdown(f"**{title}**")
+
+    st.divider()
+
+    for _, row in df_display.iterrows():
+        reg_id = int(row["ID"])
+        row_cols = st.columns(column_ratios)
+        row_cols[0].write(reg_id)
+        row_cols[1].write(row["Nome Completo"])
+        row_cols[2].write(row["Data Nascimento"])
+        row_cols[3].write(row["WhatsApp"])
+        row_cols[4].write(row["Igreja"])
+        row_cols[5].write(row["Responsável"] or "—")
+        row_cols[6].write(row["Tel. Responsável"] or "—")
+        row_cols[7].write(row["Oficinas"] or "—")
+        row_cols[8].write(row["Data Inscrição"])
+        if row_cols[9].button(
+            "🗑️",
+            key=f"del_ins_{event_id}_{reg_id}",
+            help="Excluir inscrição",
+        ):
+            db.delete_registration(reg_id)
+            st.success(f"Inscrição de {row['Nome Completo']} (ID {reg_id}) excluída com sucesso!")
+            st.rerun()
+
+
 def render_event_registration_header(event):
     """Exibe banner, título e datas do evento nas telas de inscrição."""
     if styles.resolve_banner_path(event["banner_path"]):
@@ -229,27 +323,27 @@ elif st.session_state.page == 'register':
                 st.session_state.page = 'home'
                 st.rerun()
         else:
-            st.markdown("### 📝 Formulário de Inscrição")
+            with st.container(border=True):
+                st.markdown("### 📝 Formulário de Inscrição")
 
-            nome = st.text_input(
-                "Nome Completo *",
-                placeholder="Digite seu nome completo",
-                key=f"register_nome_{event['id']}",
-            )
+                nome = st.text_input(
+                    "Nome Completo *",
+                    placeholder="Digite seu nome completo",
+                    key=f"register_nome_{event['id']}",
+                )
 
-            data_nascimento = st.date_input(
-                "Data de Nascimento *",
-                value=date(2000, 1, 1),
-                min_value=date(1920, 1, 1),
-                max_value=date.today(),
-                format="DD/MM/YYYY",
-                key=f"birth_date_{event['id']}",
-            )
-            requires_guardian = db.is_minor(data_nascimento)
-            if requires_guardian:
-                st.warning("Participante menor de 18 anos: nome e telefone do responsável são obrigatórios.")
+                data_nascimento = st.date_input(
+                    "Data de Nascimento *",
+                    value=date(2000, 1, 1),
+                    min_value=date(1920, 1, 1),
+                    max_value=date.today(),
+                    format="DD/MM/YYYY",
+                    key=f"birth_date_{event['id']}",
+                )
+                requires_guardian = db.is_minor(data_nascimento)
+                if requires_guardian:
+                    st.warning("Participante menor de 18 anos: nome e telefone do responsável são obrigatórios.")
 
-            with st.form(key="form_inscricao"):
                 whatsapp = st.text_input("WhatsApp / Celular *", placeholder="(00) 90000-0000")
                 igreja = st.text_input("Igreja / Congregação *", placeholder="Ex: Comunidade Batista Hope")
 
@@ -274,7 +368,11 @@ elif st.session_state.page == 'register':
                 )
 
                 st.write("")
-                submit_button = st.form_submit_button("Confirmar Minha Inscrição")
+                submit_button = st.button(
+                    "Confirmar Minha Inscrição",
+                    use_container_width=True,
+                    type="primary",
+                )
 
             if submit_button:
                 if not nome or not whatsapp or not igreja:
@@ -819,66 +917,33 @@ elif st.session_state.page == 'admin':
             if len(registrations) == 0:
                 st.info("Nenhuma inscrição realizada para este evento ainda.")
             else:
-                # Exibir DataFrame de inscrições
-                df_reg = pd.DataFrame(registrations)
-                
-                # Limpar e traduzir colunas para exibição
-                df_display = df_reg[[
-                    "id", "nome", "data_nascimento", "whatsapp", "igreja",
-                    "responsavel_nome", "responsavel_telefone",
-                    "oficina_nome", "oficina_nome_2", "data_inscricao"
-                ]].copy()
-                df_display["responsavel_nome"] = df_display["responsavel_nome"].fillna("")
-                df_display["responsavel_telefone"] = df_display["responsavel_telefone"].fillna("")
-                df_display["oficina_nome"] = df_display["oficina_nome"].fillna("")
-                df_display["oficina_nome_2"] = df_display["oficina_nome_2"].fillna("")
-                df_display["data_nascimento"] = df_display["data_nascimento"].apply(db.format_date_br)
-                df_display["data_inscricao"] = df_display["data_inscricao"].apply(db.format_datetime_br)
+                df_display = build_registrations_display_df(registrations)
 
-                def format_workshops(row):
-                    workshops_list = []
-                    for col in ("oficina_nome", "oficina_nome_2"):
-                        value = row.get(col)
-                        if pd.notna(value):
-                            text = str(value).strip()
-                            if text:
-                                workshops_list.append(text)
-                    return " / ".join(workshops_list)
-
-                df_display["oficinas"] = df_display.apply(format_workshops, axis=1)
-                df_display = df_display[[
-                    "id", "nome", "data_nascimento", "whatsapp", "igreja",
-                    "responsavel_nome", "responsavel_telefone", "oficinas", "data_inscricao"
-                ]]
-                df_display.columns = [
-                    "ID", "Nome Completo", "Data Nascimento",
-                    "WhatsApp", "Igreja", "Responsável", "Tel. Responsável",
-                    "Oficinas", "Data Inscrição"
-                ]
-                
-                st.dataframe(df_display, use_container_width=True)
-                
-                # Exportar dados
-                csv = df_display.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Baixar Planilha (CSV)",
-                    data=csv,
-                    file_name=f"inscricoes_{selected_event_name_ins.lower().replace(' ', '_')}.csv",
-                    mime="text/csv",
-                    use_container_width=True
+                name_filter = st.text_input(
+                    "Buscar por nome:",
+                    placeholder="Digite parte do nome do inscrito",
+                    key=f"ins_name_filter_{selected_event_id_ins}",
                 )
-                
-                # Excluir inscrição específica
-                st.write("#### Cancelar Inscrição")
-                id_to_delete = st.number_input("Digite o ID da inscrição a excluir:", min_value=1, step=1)
-                if st.button("Excluir Inscrição"):
-                    # Verificar se o ID existe
-                    if id_to_delete in df_display["ID"].values:
-                        db.delete_registration(id_to_delete)
-                        st.success(f"Inscrição ID {id_to_delete} excluída com sucesso!")
-                        st.rerun()
-                    else:
-                        st.error("ID de inscrição não encontrado neste evento.")
+                df_filtered = filter_registrations_by_name(df_display, name_filter)
+
+                if name_filter.strip():
+                    st.caption(f"Exibindo {len(df_filtered)} de {len(df_display)} inscrições.")
+                else:
+                    st.caption(f"{len(df_display)} inscrições no total.")
+
+                if len(df_filtered) == 0:
+                    st.info("Nenhum inscrito encontrado com esse nome.")
+                else:
+                    render_registrations_admin_table(df_filtered, selected_event_id_ins)
+
+                    csv = df_filtered.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        label="📥 Baixar Planilha (CSV)",
+                        data=csv,
+                        file_name=f"inscricoes_{selected_event_name_ins.lower().replace(' ', '_')}.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
 
     # Botão de voltar ao portal geral
     st.write("")
