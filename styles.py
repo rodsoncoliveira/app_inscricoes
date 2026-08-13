@@ -502,6 +502,49 @@ def apply_admin_layout():
     """
     st.markdown(admin_css, unsafe_allow_html=True)
 
+
+def apply_admin_workshops_styles():
+    """Estilos compactos para a gestão de oficinas no admin."""
+    workshops_css = """
+    <style>
+    .workshop-card-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0 0 0.15rem 0;
+    }
+
+    .workshop-card-subtitle {
+        font-size: 0.88rem;
+        color: #a1a1aa;
+        margin: 0 0 0.65rem 0;
+    }
+
+    .workshop-card-meta {
+        font-size: 0.82rem;
+        color: #71717a;
+        margin-top: 0.35rem;
+    }
+
+    div[data-testid="stMetric"] {
+        background: linear-gradient(135deg, #16161a 0%, #1c1c22 100%);
+        border: 1px solid #2a2a32;
+        border-radius: 12px;
+        padding: 0.65rem 0.85rem;
+    }
+
+    div[data-testid="stMetric"] label {
+        color: #a1a1aa !important;
+        font-size: 0.78rem !important;
+    }
+
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        font-size: 1.35rem !important;
+    }
+    </style>
+    """
+    st.markdown(workshops_css, unsafe_allow_html=True)
+
 def apply_event_styles(cor_primaria, cor_secundaria):
     """Injeta regras de estilo customizadas dinamicamente de acordo com o tema do evento selecionado."""
     event_css = f"""
