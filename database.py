@@ -665,6 +665,19 @@ def is_minor(data_nascimento):
     return age < 18
 
 
+def validate_guardian_fields(data_nascimento, responsavel_nome, responsavel_telefone):
+    """Valida dados do responsável quando o participante é menor de idade."""
+    nome = responsavel_nome.strip() if responsavel_nome else ""
+    telefone = responsavel_telefone.strip() if responsavel_telefone else ""
+
+    if is_minor(data_nascimento):
+        if not nome or not telefone:
+            return False, "Menores de 18 anos devem informar nome e telefone do responsável.", None, None
+        return True, "", nome, telefone
+
+    return True, "", None, None
+
+
 def _count_workshop_occupancy(cursor, oficina_id, exclude_registration_id=None):
     query = """
         SELECT COUNT(*) as ocupadas FROM inscricoes
@@ -719,12 +732,13 @@ def create_registration(
     if isinstance(data_nascimento, date):
         data_nascimento = data_nascimento.isoformat()
 
-    if is_minor(data_nascimento):
-        if not responsavel_nome or not responsavel_telefone:
-            return False, "Menores de 18 anos devem informar nome e telefone do responsável.", None
-    else:
-        responsavel_nome = None
-        responsavel_telefone = None
+    guardian_ok, guardian_error, responsavel_nome, responsavel_telefone = validate_guardian_fields(
+        data_nascimento,
+        responsavel_nome,
+        responsavel_telefone,
+    )
+    if not guardian_ok:
+        return False, guardian_error, None
 
     valid_selection, selection_error = _validate_workshop_selection(oficina_id, oficina_id_2)
     if not valid_selection:

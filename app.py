@@ -185,27 +185,40 @@ elif st.session_state.page == 'register':
 
             workshops = db.get_workshop_vagas_info(event['id'])
 
+            data_nascimento = st.date_input(
+                "Data de Nascimento *",
+                value=date(2000, 1, 1),
+                min_value=date(1920, 1, 1),
+                max_value=date.today(),
+                format="DD/MM/YYYY",
+                key=f"birth_date_{event['id']}",
+            )
+            requires_guardian = db.is_minor(data_nascimento)
+            if requires_guardian:
+                st.warning("Participante menor de 18 anos: nome e telefone do responsável são obrigatórios.")
+
             with st.form(key="form_inscricao"):
                 nome = st.text_input("Nome Completo *", placeholder="Digite seu nome completo")
-                data_nascimento = st.date_input(
-                    "Data de Nascimento *",
-                    value=date(2000, 1, 1),
-                    min_value=date(1920, 1, 1),
-                    max_value=date.today(),
-                    format="DD/MM/YYYY"
-                )
                 whatsapp = st.text_input("WhatsApp / Celular *", placeholder="(00) 90000-0000")
                 igreja = st.text_input("Igreja / Congregação *", placeholder="Ex: Comunidade Batista Hope")
 
                 st.write("")
                 st.markdown("#### 👨‍👩‍👧 Dados do Responsável")
-                st.caption("Obrigatório para participantes menores de 18 anos.")
+                if requires_guardian:
+                    st.caption("Campos obrigatórios para menores de idade.")
+                    responsavel_nome_label = "Nome do Responsável *"
+                    responsavel_telefone_label = "Telefone do Responsável *"
+                else:
+                    st.caption("Opcional. Obrigatório apenas para participantes menores de 18 anos.")
+                    responsavel_nome_label = "Nome do Responsável"
+                    responsavel_telefone_label = "Telefone do Responsável"
+
                 responsavel_nome = st.text_input(
-                    "Nome do Responsável",
+                    responsavel_nome_label,
                     placeholder="Digite o nome completo do responsável",
                 )
                 responsavel_telefone = st.text_input(
-                    "Telefone do Responsável",
+                    responsavel_telefone_label,
                     placeholder="(00) 90000-0000",
                 )
 
@@ -257,75 +270,81 @@ elif st.session_state.page == 'register':
 
                 if not nome or not whatsapp or not igreja:
                     st.error("Por favor, preencha todos os campos obrigatórios (*).")
-                elif db.is_minor(data_nascimento) and (not responsavel_nome or not responsavel_telefone):
-                    st.error("Menores de 18 anos devem informar nome e telefone do responsável.")
-                elif chosen_workshop_1 and chosen_workshop_2 and chosen_workshop_1['id'] == chosen_workshop_2['id']:
-                    st.error("Selecione duas oficinas diferentes.")
-                elif blocked_1:
-                    st.error(f"A oficina '{chosen_workshop_1['nome']}' já está lotada! Por favor, escolha outra.")
-                elif blocked_2:
-                    st.error(f"A oficina '{chosen_workshop_2['nome']}' já está lotada! Por favor, escolha outra.")
                 else:
-                    oficina_id = chosen_workshop_1['id'] if chosen_workshop_1 else None
-                    oficina_id_2 = chosen_workshop_2['id'] if chosen_workshop_2 else None
-                    data_nasc_str = data_nascimento.isoformat()
-
-                    with st.status("Salvando sua inscrição...", expanded=True) as save_status:
-                        st.write("Validando vagas e registrando seus dados...")
-                        success, result, action = db.create_registration(
-                            evento_id=event['id'],
-                            nome=nome,
-                            data_nascimento=data_nasc_str,
-                            whatsapp=whatsapp,
-                            igreja=igreja,
-                            oficina_id=oficina_id,
-                            oficina_id_2=oficina_id_2,
-                            responsavel_nome=responsavel_nome.strip() if responsavel_nome else None,
-                            responsavel_telefone=responsavel_telefone.strip() if responsavel_telefone else None,
-                        )
-
-                    if success:
-                        save_status.update(
-                            label="Inscrição confirmada!",
-                            state="complete",
-                            expanded=False,
-                        )
-                        workshops_summary = []
-                        if chosen_workshop_1:
-                            workshops_summary.append({
-                                "label": "Oficina 1",
-                                "nome": chosen_workshop_1["nome"],
-                                "preletor": chosen_workshop_1["preletor"],
-                            })
-                        if chosen_workshop_2:
-                            workshops_summary.append({
-                                "label": "Oficina 2",
-                                "nome": chosen_workshop_2["nome"],
-                                "preletor": chosen_workshop_2["preletor"],
-                            })
-
-                        summary_data = {
-                            "action": action,
-                            "nome": nome,
-                            "data_nascimento": db.format_date_br(data_nascimento),
-                            "evento": event["nome"],
-                            "workshops": workshops_summary,
-                            "celebration_shown": False,
-                        }
-                        if db.is_minor(data_nascimento):
-                            summary_data["responsavel_nome"] = responsavel_nome.strip()
-                            summary_data["responsavel_telefone"] = responsavel_telefone.strip()
-
-                        st.session_state.registration_summary = summary_data
-
-                        st.rerun()
+                    guardian_ok, guardian_error, resp_nome, resp_tel = db.validate_guardian_fields(
+                        data_nascimento,
+                        responsavel_nome,
+                        responsavel_telefone,
+                    )
+                    if not guardian_ok:
+                        st.error(guardian_error)
+                    elif chosen_workshop_1 and chosen_workshop_2 and chosen_workshop_1['id'] == chosen_workshop_2['id']:
+                        st.error("Selecione duas oficinas diferentes.")
+                    elif blocked_1:
+                        st.error(f"A oficina '{chosen_workshop_1['nome']}' já está lotada! Por favor, escolha outra.")
+                    elif blocked_2:
+                        st.error(f"A oficina '{chosen_workshop_2['nome']}' já está lotada! Por favor, escolha outra.")
                     else:
-                        save_status.update(
-                            label="Não foi possível salvar a inscrição",
-                            state="error",
-                            expanded=False,
-                        )
-                        st.error(f"Erro ao realizar inscrição: {result}")
+                        oficina_id = chosen_workshop_1['id'] if chosen_workshop_1 else None
+                        oficina_id_2 = chosen_workshop_2['id'] if chosen_workshop_2 else None
+                        data_nasc_str = data_nascimento.isoformat()
+
+                        with st.status("Salvando sua inscrição...", expanded=True) as save_status:
+                            st.write("Validando vagas e registrando seus dados...")
+                            success, result, action = db.create_registration(
+                                evento_id=event['id'],
+                                nome=nome,
+                                data_nascimento=data_nasc_str,
+                                whatsapp=whatsapp,
+                                igreja=igreja,
+                                oficina_id=oficina_id,
+                                oficina_id_2=oficina_id_2,
+                                responsavel_nome=resp_nome,
+                                responsavel_telefone=resp_tel,
+                            )
+
+                        if success:
+                            save_status.update(
+                                label="Inscrição confirmada!",
+                                state="complete",
+                                expanded=False,
+                            )
+                            workshops_summary = []
+                            if chosen_workshop_1:
+                                workshops_summary.append({
+                                    "label": "Oficina 1",
+                                    "nome": chosen_workshop_1["nome"],
+                                    "preletor": chosen_workshop_1["preletor"],
+                                })
+                            if chosen_workshop_2:
+                                workshops_summary.append({
+                                    "label": "Oficina 2",
+                                    "nome": chosen_workshop_2["nome"],
+                                    "preletor": chosen_workshop_2["preletor"],
+                                })
+
+                            summary_data = {
+                                "action": action,
+                                "nome": nome,
+                                "data_nascimento": db.format_date_br(data_nascimento),
+                                "evento": event["nome"],
+                                "workshops": workshops_summary,
+                                "celebration_shown": False,
+                            }
+                            if db.is_minor(data_nascimento):
+                                summary_data["responsavel_nome"] = resp_nome
+                                summary_data["responsavel_telefone"] = resp_tel
+
+                            st.session_state.registration_summary = summary_data
+
+                            st.rerun()
+                        else:
+                            save_status.update(
+                                label="Não foi possível salvar a inscrição",
+                                state="error",
+                                expanded=False,
+                            )
+                            st.error(f"Erro ao realizar inscrição: {result}")
 
             if st.button("Voltar ao Início", key="btn_back_home", use_container_width=True):
                 st.session_state.page = 'home'
