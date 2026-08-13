@@ -52,10 +52,21 @@ def apply_global_styles():
         max-width: 800px;
     }}
     
-    /* Ocultar elementos de desenvolvimento do Streamlit */
+    /* Ocultar menu hambúrguer padrão do Streamlit, mas manter botão da sidebar */
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
-    header {{visibility: hidden;}}
+
+    [data-testid="stHeader"] {{
+        background: transparent;
+    }}
+
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="stSidebarCollapseButton"],
+    button[data-testid="stSidebarCollapsedControl"] {{
+        visibility: visible !important;
+        display: flex !important;
+        color: #F3F4F6 !important;
+    }}
     
     /* Scrollbar personalizada */
     ::-webkit-scrollbar {{

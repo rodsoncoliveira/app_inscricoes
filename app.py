@@ -34,6 +34,41 @@ def get_admin_password():
     except (KeyError, FileNotFoundError, AttributeError):
         return os.environ.get("ADMIN_PASSWORD", "admin123")
 
+def render_admin_area(key_prefix="sidebar"):
+    """Renderiza login e atalhos do painel administrativo."""
+    st.markdown("### 🔐 Área Restrita")
+
+    if st.session_state.admin_logged_in:
+        st.success("Administrador autenticado")
+        if st.button("Painel Administrativo", use_container_width=True, key=f"{key_prefix}_admin_panel"):
+            st.session_state.page = "admin"
+            st.rerun()
+        if st.button("Sair da Administração", use_container_width=True, key=f"{key_prefix}_admin_logout"):
+            st.session_state.admin_logged_in = False
+            st.session_state.page = "home"
+            st.rerun()
+    else:
+        if key_prefix == "sidebar":
+            st.caption("Toque em ☰ no canto superior para abrir este menu.")
+        admin_password = st.text_input(
+            "Senha Admin",
+            type="password",
+            key=f"{key_prefix}_admin_pwd_input",
+        )
+        if st.button("Entrar", use_container_width=True, key=f"{key_prefix}_admin_login"):
+            if admin_password == get_admin_password():
+                st.session_state.admin_logged_in = True
+                st.session_state.page = "admin"
+                st.success("Login realizado com sucesso!")
+                st.rerun()
+            else:
+                st.error("Senha incorreta!")
+
+def render_admin_footer_access():
+    """Acesso administrativo visível no rodapé (fallback quando a sidebar está fechada)."""
+    with st.expander("🔐 Área administrativa"):
+        render_admin_area(key_prefix="footer")
+
 # Função para cadastrar dados iniciais (seeding) caso o banco esteja vazio
 def seed_initial_data():
     events = db.get_all_events()
@@ -68,28 +103,7 @@ styles.apply_global_styles()
 
 # Menu lateral para acessar o painel administrativo de forma limpa
 with st.sidebar:
-    st.markdown("### 🔐 Área Restrita")
-    st.caption("No celular, toque em ☰ (canto superior) para abrir este menu.")
-    
-    if st.session_state.admin_logged_in:
-        st.success("Administrador Autenticado")
-        if st.button("Painel Administrativo", use_container_width=True):
-            st.session_state.page = 'admin'
-            st.rerun()
-        if st.button("Sair da Administração", use_container_width=True):
-            st.session_state.admin_logged_in = False
-            st.session_state.page = 'home'
-            st.rerun()
-    else:
-        admin_password = st.text_input("Senha Admin", type="password", key="admin_pwd_input")
-        if st.button("Entrar", use_container_width=True):
-            if admin_password == get_admin_password():
-                st.session_state.admin_logged_in = True
-                st.session_state.page = 'admin'
-                st.success("Login realizado com sucesso!")
-                st.rerun()
-            else:
-                st.error("Senha incorreta!")
+    render_admin_area(key_prefix="sidebar")
 
 # Navegação principal do Portal
 
@@ -119,6 +133,7 @@ if st.session_state.page == 'home':
                 st.session_state.page = 'register'
                 st.rerun()
                 
+    render_admin_footer_access()
     styles.render_footer()
 
 elif st.session_state.page == 'register':
@@ -304,6 +319,7 @@ elif st.session_state.page == 'register':
                 st.session_state.page = 'home'
                 st.rerun()
             
+        render_admin_footer_access()
         styles.render_footer()
 
 elif st.session_state.page == 'admin':
