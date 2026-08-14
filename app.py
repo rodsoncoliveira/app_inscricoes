@@ -157,7 +157,6 @@ def render_registrations_admin_table(df_display, event_id):
 
 def render_workshops_admin_tab():
     """Painel admin de oficinas: catálogo reutilizável e vínculos por evento."""
-    styles.apply_admin_workshops_styles()
     st.subheader("Oficinas")
     st.caption("Cadastre no catálogo e escolha quais oficinas entram em cada evento.")
 
@@ -447,7 +446,6 @@ def _render_workshop_event_panel():
 
 def render_admin_dashboard_tab():
     """Dashboard com métricas e gráficos do evento selecionado."""
-    styles.apply_admin_dashboard_styles()
     st.subheader("Dashboard")
     st.caption("Visão geral de inscrições, igrejas e ocupação das oficinas.")
 

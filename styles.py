@@ -480,7 +480,7 @@ def apply_global_styles():
     st.markdown(global_css, unsafe_allow_html=True)
 
 def apply_admin_layout():
-    """Layout mais largo no painel admin (desktop), mantendo mobile centralizado."""
+    """Layout e estilos compartilhados do painel admin."""
     admin_css = """
     <style>
     @media (min-width: 769px) {
@@ -498,15 +498,7 @@ def apply_admin_layout():
             margin-bottom: 0.5rem;
         }
     }
-    </style>
-    """
-    st.markdown(admin_css, unsafe_allow_html=True)
 
-
-def apply_admin_workshops_styles():
-    """Estilos compactos para a gestão de oficinas no admin."""
-    workshops_css = """
-    <style>
     .workshop-card-title {
         font-size: 1rem;
         font-weight: 700;
@@ -541,15 +533,7 @@ def apply_admin_workshops_styles():
     div[data-testid="stMetric"] [data-testid="stMetricValue"] {
         font-size: 1.35rem !important;
     }
-    </style>
-    """
-    st.markdown(workshops_css, unsafe_allow_html=True)
 
-
-def apply_admin_dashboard_styles():
-    """Estilos do dashboard administrativo."""
-    dashboard_css = """
-    <style>
     .dash-status-pill {
         display: inline-block;
         padding: 0.35rem 0.75rem;
@@ -579,7 +563,17 @@ def apply_admin_dashboard_styles():
     }
     </style>
     """
-    st.markdown(dashboard_css, unsafe_allow_html=True)
+    st.markdown(admin_css, unsafe_allow_html=True)
+
+
+def apply_admin_workshops_styles():
+    """Compatibilidade: estilos já aplicados em apply_admin_layout()."""
+    apply_admin_layout()
+
+
+def apply_admin_dashboard_styles():
+    """Compatibilidade: estilos já aplicados em apply_admin_layout()."""
+    apply_admin_layout()
 
 def apply_event_styles(cor_primaria, cor_secundaria):
     """Injeta regras de estilo customizadas dinamicamente de acordo com o tema do evento selecionado."""
