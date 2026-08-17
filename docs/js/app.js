@@ -46,7 +46,7 @@ async function renderHome() {
   const cards = events.map((ev) => {
     const banner = resolveBanner(ev.banner_path);
     const bannerHtml = banner
-      ? `<img class="banner" src="${escapeHtml(banner)}" alt="Banner">`
+      ? `<div class="banner-frame"><img class="banner" src="${escapeHtml(banner)}" alt="Banner do evento"></div>`
       : "";
     const dates = `${formatDateBR(ev.data_inicio)} a ${formatDateBR(ev.data_fim)}`;
     return `
@@ -88,7 +88,7 @@ function renderRegisterForm(errorMsg = "") {
   root.innerHTML = `
     <div class="wrap">
       ${renderSiteHeader(ev.nome, `${formatDateBR(ev.data_inicio)} a ${formatDateBR(ev.data_fim)}`)}
-      ${banner ? `<img class="banner card" src="${escapeHtml(banner)}" alt="" style="width:100%;margin-bottom:16px;border-radius:12px">` : ""}
+      ${banner ? `<div class="banner-frame banner-frame-lg"><img class="banner" src="${escapeHtml(banner)}" alt="Banner do evento"></div>` : ""}
       <div class="card">
         <h2>Formulário de Inscrição</h2>
         ${errorMsg ? `<div class="alert alert-error">${escapeHtml(errorMsg)}</div>` : ""}

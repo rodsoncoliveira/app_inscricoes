@@ -131,13 +131,34 @@ header.site-header p {
   transform: translateY(-2px);
 }
 
-.event-card img.banner {
+.banner-frame {
   width: 100%;
-  max-height: 200px;
-  object-fit: contain;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #121214;
+  border: 1px solid var(--line);
   border-radius: 10px;
   margin-bottom: 12px;
-  background: #121214;
+  overflow: hidden;
+}
+
+.banner-frame-lg {
+  height: 240px;
+  margin-bottom: 16px;
+}
+
+.banner-frame img.banner {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .field { margin-bottom: 14px; }
