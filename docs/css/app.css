@@ -134,11 +134,16 @@ header.site-header p {
 .banner-frame {
   width: 100%;
   margin-bottom: 12px;
-  background: #121214;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   overflow: hidden;
   line-height: 0;
+}
+
+.event-card > .banner-frame {
+  margin: -20px -20px 16px;
+  width: auto;
 }
 
 .banner-frame-lg {
@@ -149,12 +154,16 @@ header.site-header p {
   width: 100%;
   height: auto;
   display: block;
-  border-radius: 10px;
+  border-radius: 0;
+}
+
+.event-card > .banner-frame img.banner {
+  border-radius: var(--radius) var(--radius) 0 0;
 }
 
 .banner-frame-lg img.banner {
-  max-width: min(100%, 720px);
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
 }
 
 .field { margin-bottom: 14px; }
@@ -214,10 +223,7 @@ header.site-header p {
 
 .banner-preview {
   margin: 0 0 10px;
-  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid var(--line);
-  background: #121214;
   line-height: 0;
 }
 
