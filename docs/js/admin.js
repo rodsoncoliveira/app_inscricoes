@@ -4,24 +4,36 @@ import {
   signOutAdmin,
   onAuthChange,
   getAllEvents,
+  getEvent,
   getRegistrations,
   deleteRegistration,
   getWorkshopsVagas,
   getAllWorkshops,
   linkWorkshop,
   createWorkshopCatalog,
-} from "./api.js";
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  uploadEventBanner,
+  deleteEventBanner,
+} from "./api.js?v=10";
 import {
   escapeHtml,
   formatDateBR,
   formatDateTimeBR,
   isMinor,
   filterByName,
-} from "./utils.js";
+  trimOrEmpty,
+  validateEventDates,
+  normalizeWhatsappUrl,
+  todayBR,
+  resolveBanner,
+} from "./utils.js?v=10";
 
 const root = document.getElementById("admin-app");
 let tab = "dashboard";
 let selectedEventId = null;
+let editingEventId = null;
 
 function renderLogin(msg = "") {
   root.innerHTML = `
@@ -59,6 +71,7 @@ function shell(content) {
       </header>
       <nav class="tabs">
         <button class="tab ${tab === "dashboard" ? "active" : ""}" data-tab="dashboard">Dashboard</button>
+        <button class="tab ${tab === "eventos" ? "active" : ""}" data-tab="eventos">Eventos</button>
         <button class="tab ${tab === "inscricoes" ? "active" : ""}" data-tab="inscricoes">Inscrições</button>
         <button class="tab ${tab === "oficinas" ? "active" : ""}" data-tab="oficinas">Oficinas</button>
         <button class="tab" id="logoutBtn">Sair</button>
@@ -236,9 +249,251 @@ async function renderOficinas(events) {
   };
 }
 
+function eventFormFields(ev = {}, { isEdit = false } = {}) {
+  const v = (key, fallback = "") => ev[key] ?? fallback;
+  const checked = Number(ev.ativo ?? 1) === 1 ? "checked" : "";
+  const today = todayBR();
+  const dateVal = (key) => {
+    const raw = String(v(key)).slice(0, 10);
+    return raw && raw !== "undefined" ? raw : today;
+  };
+  const bannerPath = v("banner_path");
+  const bannerSrc = resolveBanner(bannerPath);
+  const bannerPreview = bannerSrc
+    ? `<div class="banner-preview"><img src="${escapeHtml(bannerSrc)}" alt="Banner atual"></div>`
+    : "";
+  const removeBanner = isEdit && bannerPath
+    ? `<label class="checkbox-row"><input type="checkbox" name="remove_banner"> Remover banner atual</label>`
+    : "";
+  return `
+    <div class="field"><label>Nome do evento *</label><input name="nome" required value="${escapeHtml(v("nome"))}"></div>
+    <div class="field"><label>Descrição</label><textarea name="descricao" rows="3">${escapeHtml(v("descricao"))}</textarea></div>
+    <div class="form-grid-2">
+      <div class="field"><label>Data início *</label><input name="data_inicio" type="date" required value="${escapeHtml(dateVal("data_inicio"))}"></div>
+      <div class="field"><label>Data fim *</label><input name="data_fim" type="date" required value="${escapeHtml(dateVal("data_fim"))}"></div>
+      <div class="field"><label>Início inscrições *</label><input name="inicio_inscricoes" type="date" required value="${escapeHtml(dateVal("inicio_inscricoes"))}"></div>
+      <div class="field"><label>Fim inscrições *</label><input name="fim_inscricoes" type="date" required value="${escapeHtml(dateVal("fim_inscricoes"))}"></div>
+    </div>
+    <div class="field">
+      <label>Banner do evento ${isEdit ? "" : "*"}</label>
+      ${bannerPreview}
+      <input type="hidden" name="banner_path" value="${escapeHtml(bannerPath)}">
+      <input type="file" name="banner_file" accept="image/jpeg,image/jpg,image/png" ${isEdit ? "" : "required"}>
+      <p class="field-hint">JPG ou PNG, até 5 MB.${isEdit ? " Deixe em branco para manter o banner atual." : ""}</p>
+    </div>
+    ${removeBanner}
+    <div class="field"><label>Link do grupo WhatsApp</label><input name="whatsapp_grupo_url" placeholder="https://chat.whatsapp.com/..." value="${escapeHtml(v("whatsapp_grupo_url"))}"></div>
+    <div class="form-grid-2">
+      <div class="field"><label>Cor primária</label><input name="cor_primaria" type="color" value="${escapeHtml(v("cor_primaria", "#FF5733"))}"></div>
+      <div class="field"><label>Cor secundária</label><input name="cor_secundaria" type="color" value="${escapeHtml(v("cor_secundaria", "#1e1e24"))}"></div>
+    </div>
+    <label class="checkbox-row"><input type="checkbox" name="ativo" ${checked}> Evento ativo</label>
+  `;
+}
+
+function bindEventForm(form, handlers) {
+  const { onSave, onCancel, errorMsg = "", requireBanner = false } = handlers;
+  if (errorMsg) {
+    const alert = document.createElement("div");
+    alert.className = "alert alert-error";
+    alert.textContent = errorMsg;
+    form.prepend(alert);
+  }
+  if (onCancel) {
+    form.querySelector('[data-action="cancel"]')?.addEventListener("click", (e) => {
+      e.preventDefault();
+      onCancel();
+    });
+  }
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const payload = {
+      nome: trimOrEmpty(fd.get("nome")),
+      data_inicio: String(fd.get("data_inicio") || "").slice(0, 10),
+      data_fim: String(fd.get("data_fim") || "").slice(0, 10),
+      inicio_inscricoes: String(fd.get("inicio_inscricoes") || "").slice(0, 10),
+      fim_inscricoes: String(fd.get("fim_inscricoes") || "").slice(0, 10),
+    };
+    if (!payload.nome) {
+      await onSave(null, "O nome do evento é obrigatório.");
+      return;
+    }
+    const dateErrors = validateEventDates(
+      payload.data_inicio,
+      payload.data_fim,
+      payload.inicio_inscricoes,
+      payload.fim_inscricoes,
+    );
+    if (dateErrors.length) {
+      await onSave(null, dateErrors[0]);
+      return;
+    }
+    fd.set("whatsapp_grupo_url", normalizeWhatsappUrl(fd.get("whatsapp_grupo_url")));
+    try {
+      const bannerResult = await processBannerUpload(fd, requireBanner);
+      if (bannerResult.error) {
+        await onSave(null, bannerResult.error);
+        return;
+      }
+      await onSave(fd);
+    } catch (err) {
+      await onSave(null, err.message || "Erro ao salvar evento.");
+    }
+  });
+}
+
+async function processBannerUpload(fd, requireBanner) {
+  const removeBanner = fd.get("remove_banner") === "on";
+  let bannerPath = trimOrEmpty(fd.get("banner_path"));
+  const bannerFile = fd.get("banner_file");
+
+  if (removeBanner) {
+    if (bannerPath) {
+      try {
+        await deleteEventBanner(bannerPath);
+      } catch (_) {
+        /* banner antigo pode ser caminho local legado */
+      }
+    }
+    bannerPath = "";
+  } else if (bannerFile instanceof File && bannerFile.size > 0) {
+    const allowed = ["image/jpeg", "image/jpg", "image/png"];
+    if (!allowed.includes(bannerFile.type)) {
+      return { error: "Use uma imagem JPG ou PNG." };
+    }
+    if (bannerFile.size > 5 * 1024 * 1024) {
+      return { error: "A imagem deve ter no máximo 5 MB." };
+    }
+    const oldPath = bannerPath;
+    bannerPath = await uploadEventBanner(bannerFile, fd.get("nome"));
+    if (oldPath && oldPath !== bannerPath) {
+      try {
+        await deleteEventBanner(oldPath);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+
+  if (requireBanner && !bannerPath) {
+    return { error: "Envie uma imagem de banner para o evento." };
+  }
+
+  fd.set("banner_path", bannerPath);
+  return { ok: true };
+}
+
+async function renderEventos(events, createError = "", editError = "") {
+  let editEvent = null;
+  if (editingEventId) {
+    editEvent = events.find((e) => e.id === editingEventId) || await getEvent(editingEventId);
+    if (!editEvent) editingEventId = null;
+  }
+
+  const listHtml = events.length
+    ? events.map((ev) => {
+        const status = Number(ev.ativo) === 1 ? "Ativo" : "Inativo";
+        return `
+          <div class="card" style="margin-bottom:12px">
+            <h3 style="margin:0 0 8px">${escapeHtml(ev.nome)} <span style="color:var(--muted);font-size:0.85rem">(${status})</span></h3>
+            <p style="margin:0 0 8px;color:var(--muted)">${formatDateBR(ev.data_inicio)} a ${formatDateBR(ev.data_fim)} · Inscrições: ${formatDateBR(ev.inicio_inscricoes)} a ${formatDateBR(ev.fim_inscricoes)}</p>
+            <div class="btn-row">
+              <button class="btn btn-secondary" data-edit="${ev.id}">Editar</button>
+              <button class="btn btn-secondary" data-del-ev="${ev.id}">Excluir</button>
+            </div>
+          </div>`;
+      }).join("")
+    : `<div class="alert alert-info">Nenhum evento cadastrado ainda.</div>`;
+
+  const editBlock = editEvent
+    ? `<div class="card">
+        <h2>✏️ Editar evento: ${escapeHtml(editEvent.nome)}</h2>
+        ${editError ? `<div class="alert alert-error">${escapeHtml(editError)}</div>` : ""}
+        <form id="editEventForm">${eventFormFields(editEvent, { isEdit: true })}
+          <div class="btn-row" style="margin-top:16px">
+            <button class="btn btn-primary" type="submit">Salvar alterações</button>
+            <button class="btn btn-secondary" data-action="cancel" type="button">Cancelar</button>
+          </div>
+        </form>
+      </div>`
+    : "";
+
+  root.innerHTML = shell(`
+    ${editBlock}
+    <div class="card">
+      <h2>➕ Novo evento</h2>
+      ${createError ? `<div class="alert alert-error">${escapeHtml(createError)}</div>` : ""}
+      <form id="createEventForm">${eventFormFields({})}
+        <button class="btn btn-primary" type="submit" style="margin-top:16px">Salvar evento</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Eventos cadastrados (${events.length})</h2>
+      ${listHtml}
+    </div>
+  `);
+  bindTabs();
+
+  root.querySelectorAll("[data-edit]").forEach((btn) => {
+    btn.onclick = () => {
+      editingEventId = Number(btn.dataset.edit);
+      renderEventos(events);
+    };
+  });
+
+  root.querySelectorAll("[data-del-ev]").forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm("Excluir este evento e todas as inscrições vinculadas?")) return;
+      await deleteEvent(Number(btn.dataset.delEv));
+      if (selectedEventId === Number(btn.dataset.delEv)) selectedEventId = null;
+      if (editingEventId === Number(btn.dataset.delEv)) editingEventId = null;
+      await bootAdmin();
+    };
+  });
+
+  const createForm = root.querySelector("#createEventForm");
+  bindEventForm(createForm, {
+    requireBanner: true,
+    onSave: async (fd, errMsg) => {
+      if (errMsg) {
+        await renderEventos(events, errMsg);
+        return;
+      }
+      await createEvent(fd);
+      editingEventId = null;
+      tab = "eventos";
+      await bootAdmin();
+    },
+  });
+
+  const editForm = root.querySelector("#editEventForm");
+  if (editForm) {
+    bindEventForm(editForm, {
+      onSave: async (fd, errMsg) => {
+        if (errMsg) {
+          await renderEventos(events, "", errMsg);
+          return;
+        }
+        await updateEvent(editingEventId, fd);
+        editingEventId = null;
+        await bootAdmin();
+      },
+      onCancel: () => {
+        editingEventId = null;
+        bootAdmin();
+      },
+    });
+  }
+}
+
 function bindTabs() {
   root.querySelectorAll(".tab[data-tab]").forEach((btn) => {
-    btn.onclick = () => { tab = btn.dataset.tab; bootAdmin(); };
+    btn.onclick = () => {
+      if (btn.dataset.tab !== "eventos") editingEventId = null;
+      tab = btn.dataset.tab;
+      bootAdmin();
+    };
   });
   root.querySelector("#logoutBtn").onclick = async () => {
     await signOutAdmin();
@@ -249,6 +504,7 @@ function bindTabs() {
 async function bootAdmin() {
   const events = await getAllEvents();
   if (tab === "dashboard") await renderDashboard(events);
+  else if (tab === "eventos") await renderEventos(events);
   else if (tab === "inscricoes") await renderInscricoes(events);
   else await renderOficinas(events);
 }

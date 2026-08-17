@@ -38,6 +38,24 @@ export function trimOrEmpty(value) {
   return String(value ?? "").trim();
 }
 
+export function normalizeWhatsappUrl(url) {
+  if (!url) return "";
+  let normalized = String(url).trim();
+  if (!normalized) return "";
+  if (normalized.startsWith("www.")) normalized = `https://${normalized}`;
+  if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+    if (normalized.includes("chat.whatsapp.com")) normalized = `https://${normalized}`;
+  }
+  return normalized;
+}
+
+export function validateEventDates(dataInicio, dataFim, inicioInscricoes, fimInscricoes) {
+  const errors = [];
+  if (dataInicio > dataFim) errors.push("A data de fim do evento deve ser igual ou posterior à data de início.");
+  if (inicioInscricoes > fimInscricoes) errors.push("O fim das inscrições deve ser igual ou posterior ao início das inscrições.");
+  return errors;
+}
+
 export function normalizeName(name) {
   return (name || "")
     .normalize("NFD")

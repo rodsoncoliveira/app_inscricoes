@@ -9,6 +9,7 @@ No **SQL Editor**, execute na ordem:
 1. `supabase/schema.sql` (se ainda não rodou)
 2. `supabase/migration_evento_oficinas.sql` (se veio do modelo antigo)
 3. **`supabase/browser_api.sql`** (RLS + funções para o navegador)
+4. **`supabase/storage_banners.sql`** (upload de banners pelo admin)
 
 ## 2. Supabase — usuário admin
 
@@ -33,11 +34,17 @@ Se aparecer *Invalid API key*, use a chave **anon** legacy (JWT `eyJ...`) em **S
 
 ## 4. Banners e imagens
 
-Arquivos estáticos do site ficam em **`docs/image/`** (não em `image/` na raiz).
+### Upload pelo admin (recomendado)
 
-- Banners de evento: mantenha em `eventos.banner_path` caminhos como `image/nome.jpg` **desde que o arquivo exista em `docs/image/`**
-- Banners enviados pelo admin Streamlit (`image/banner_*`) **não vão automaticamente** para o GitHub Pages — copie o arquivo para `docs/image/` com o mesmo nome do banco, ou use URL completa (`https://...`) em `banner_path`
+No painel **Eventos**, envie JPG/PNG (até 5 MB). A imagem vai para o **Supabase Storage** (bucket público `banners`) e a URL fica salva em `eventos.banner_path` — funciona no GitHub Pages sem commit manual de cada arquivo.
+
+### Arquivos estáticos em `docs/image/`
+
+Logos e banners fixos do repositório ficam em **`docs/image/`**:
+
 - Logos do cabeçalho: `docs/image/LogoNextGen_nobg.png` e `docs/image/HOPE_nobg.png`
+- Banners legados: caminhos como `image/nome.jpg` **desde que o arquivo exista em `docs/image/`**
+- URLs completas (`https://...`) em `banner_path` também funcionam
 
 ## 5. Publicar o site (sempre ativo)
 

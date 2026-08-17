@@ -158,3 +158,97 @@ export async function createWorkshopCatalog(nome, preletor) {
   if (error) throw error;
   return data;
 }
+
+function eventPayloadFromForm(fd) {
+  return {
+    nome: String(fd.get("nome") || "").trim(),
+    descricao: String(fd.get("descricao") || "").trim(),
+    data_inicio: String(fd.get("data_inicio") || "").slice(0, 10),
+    data_fim: String(fd.get("data_fim") || "").slice(0, 10),
+    inicio_inscricoes: String(fd.get("inicio_inscricoes") || "").slice(0, 10),
+    fim_inscricoes: String(fd.get("fim_inscricoes") || "").slice(0, 10),
+    banner_path: String(fd.get("banner_path") || "").trim(),
+    cor_primaria: String(fd.get("cor_primaria") || "#FF5733"),
+    cor_secundaria: String(fd.get("cor_secundaria") || "#1e1e24"),
+    ativo: fd.get("ativo") ? 1 : 0,
+    whatsapp_grupo_url: String(fd.get("whatsapp_grupo_url") || "").trim() || null,
+  };
+}
+
+export async function createEvent(formData) {
+  const sb = getSupabase();
+  const payload = eventPayloadFromForm(formData);
+  const { data, error } = await sb.from("eventos").insert(payload).select("id").single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateEvent(id, formData) {
+  const sb = getSupabase();
+  const payload = eventPayloadFromForm(formData);
+  const { error } = await sb.from("eventos").update(payload).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteEvent(id) {
+  const sb = getSupabase();
+  const { error } = await sb.from("eventos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+const BANNER_BUCKET = "banners";
+const BANNER_MAX_BYTES = 5 * 1024 * 1024;
+const BANNER_MIME = new Set(["image/jpeg", "image/jpg", "image/png"]);
+
+function bannerObjectPathFromUrl(bannerPath) {
+  if (!bannerPath) return null;
+  const marker = `/storage/v1/object/public/${BANNER_BUCKET}/`;
+  const idx = bannerPath.indexOf(marker);
+  if (idx === -1) return null;
+  return decodeURIComponent(bannerPath.slice(idx + marker.length));
+}
+
+function bannerFilename(eventName, file) {
+  const ext = /\.png$/i.test(file.name) ? "png" : "jpg";
+  const slug = String(eventName || "evento")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 30) || "evento";
+  const id = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  return `banner_${slug}_${id}.${ext}`;
+}
+
+export async function uploadEventBanner(file, eventName) {
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Selecione uma imagem de banner.");
+  }
+  if (!BANNER_MIME.has(file.type)) {
+    throw new Error("Use uma imagem JPG ou PNG.");
+  }
+  if (file.size > BANNER_MAX_BYTES) {
+    throw new Error("A imagem deve ter no máximo 5 MB.");
+  }
+
+  const sb = getSupabase();
+  const path = bannerFilename(eventName, file);
+  const { error } = await sb.storage.from(BANNER_BUCKET).upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: file.type || "image/jpeg",
+  });
+  if (error) throw error;
+
+  const { data } = sb.storage.from(BANNER_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export async function deleteEventBanner(bannerPath) {
+  const objectPath = bannerObjectPathFromUrl(bannerPath);
+  if (!objectPath) return;
+  const sb = getSupabase();
+  const { error } = await sb.storage.from(BANNER_BUCKET).remove([objectPath]);
+  if (error) throw error;
+}
