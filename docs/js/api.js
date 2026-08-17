@@ -1,5 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-
 let client = null;
 
 export function getSupabase() {
@@ -11,7 +9,10 @@ export function getSupabase() {
   if (cfg.SUPABASE_URL.includes("SEU_PROJECT")) {
     throw new Error("Preencha SUPABASE_URL e SUPABASE_ANON_KEY em config.js");
   }
-  client = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  if (!window.supabase?.createClient) {
+    throw new Error("Biblioteca Supabase não carregou. Verifique sua conexão.");
+  }
+  client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   return client;
 }
 
