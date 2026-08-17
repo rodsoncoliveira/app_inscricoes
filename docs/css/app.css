@@ -229,6 +229,14 @@ header.site-header p {
 .alert-success { background: rgba(37,211,102,0.12); border: 1px solid rgba(37,211,102,0.35); color: #86efac; }
 .alert-info { background: rgba(255,87,51,0.1); border: 1px solid rgba(255,87,51,0.25); color: #fdba74; }
 
+.guardian-required {
+  border: 1px solid rgba(255, 87, 51, 0.35);
+  border-radius: 12px;
+  padding: 12px 14px 4px;
+  margin-top: 8px;
+  background: rgba(255, 87, 51, 0.06);
+}
+
 .whatsapp-cta {
   background: linear-gradient(135deg, #0b6e59 0%, #128c7e 45%, #25d366 100%);
   border-radius: var(--radius);

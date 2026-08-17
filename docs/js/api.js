@@ -67,6 +67,13 @@ export async function createOrUpdateRegistration(payload) {
     p_responsavel_telefone: payload.responsavel_telefone || null,
   });
   if (error) throw error;
+  if (typeof data === "string") {
+    try {
+      return JSON.parse(data);
+    } catch {
+      return { ok: false, error: "Resposta inválida do servidor." };
+    }
+  }
   return data;
 }
 

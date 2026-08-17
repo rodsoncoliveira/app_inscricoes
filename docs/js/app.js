@@ -5,8 +5,8 @@ import {
   createOrUpdateRegistration,
   updateRegistrationWorkshops,
   getRegistrationSummary,
-} from "./api.js";
-import { escapeHtml, formatDateBR, isMinor, resolveBanner, renderSiteHeader, showError } from "./utils.js";
+} from "./api.js?v=5";
+import { escapeHtml, formatDateBR, isMinor, trimOrEmpty, resolveBanner, renderSiteHeader, showError } from "./utils.js?v=5";
 
 const root = document.getElementById("app");
 
@@ -82,9 +82,18 @@ async function openEvent(id) {
   renderRegisterForm();
 }
 
-function renderRegisterForm(errorMsg = "") {
+function renderRegisterForm(errorMsg = "", formValues = {}) {
   const ev = state.event;
   const banner = resolveBanner(ev.banner_path);
+  const birthValue = formValues.data_nascimento || "2000-01-01";
+  const minor = isMinor(birthValue);
+  const guardianLabels = minor
+    ? { nome: "Nome do Responsável *", tel: "Telefone do Responsável *" }
+    : { nome: "Nome do Responsável", tel: "Telefone do Responsável" };
+  const guardianCaption = minor
+    ? "Campos obrigatórios para menores de idade."
+    : "Opcional. Obrigatório apenas para participantes menores de 18 anos.";
+
   root.innerHTML = `
     <div class="wrap">
       ${renderSiteHeader(ev.nome, `${formatDateBR(ev.data_inicio)} a ${formatDateBR(ev.data_fim)}`)}
@@ -93,15 +102,23 @@ function renderRegisterForm(errorMsg = "") {
         <h2>Formulário de Inscrição</h2>
         ${errorMsg ? `<div class="alert alert-error">${escapeHtml(errorMsg)}</div>` : ""}
         <form id="regForm">
-          <div class="field"><label>Nome completo *</label><input name="nome" required placeholder="Seu nome"></div>
-          <div class="field"><label>Data de nascimento *</label><input name="data_nascimento" type="date" required value="2000-01-01"></div>
-          <div id="guardianWarn" class="alert alert-info hidden">Menores de 18: informe o responsável.</div>
-          <div class="field"><label>WhatsApp *</label><input name="whatsapp" required placeholder="(00) 90000-0000"></div>
-          <div class="field"><label>Igreja / Congregação *</label><input name="igreja" required placeholder="Ex: Comunidade Hope"></div>
-          <h3 style="margin:18px 0 8px;font-size:1rem">Dados do responsável</h3>
-          <p style="color:var(--muted);font-size:0.85rem;margin:0 0 12px">Obrigatório apenas para menores de 18 anos.</p>
-          <div class="field"><label>Nome do responsável</label><input name="responsavel_nome" placeholder="Nome completo"></div>
-          <div class="field"><label>Telefone do responsável</label><input name="responsavel_telefone" placeholder="(00) 90000-0000"></div>
+          <div class="field"><label>Nome completo *</label><input name="nome" required placeholder="Seu nome" value="${escapeHtml(formValues.nome || "")}"></div>
+          <div class="field"><label>Data de nascimento *</label><input name="data_nascimento" type="date" required value="${escapeHtml(birthValue)}" max="${new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })}"></div>
+          <div id="guardianWarn" class="alert alert-info ${minor ? "" : "hidden"}">Participante menor de 18 anos: nome e telefone do responsável são obrigatórios.</div>
+          <div class="field"><label>WhatsApp *</label><input name="whatsapp" required placeholder="(00) 90000-0000" value="${escapeHtml(formValues.whatsapp || "")}"></div>
+          <div class="field"><label>Igreja / Congregação *</label><input name="igreja" required placeholder="Ex: Comunidade Hope" value="${escapeHtml(formValues.igreja || "")}"></div>
+          <div id="guardianSection" class="${minor ? "guardian-required" : ""}">
+            <h3 style="margin:18px 0 8px;font-size:1rem">Dados do responsável</h3>
+            <p id="guardianCaption" style="color:var(--muted);font-size:0.85rem;margin:0 0 12px">${escapeHtml(guardianCaption)}</p>
+            <div class="field">
+              <label id="guardianNomeLabel">${escapeHtml(guardianLabels.nome)}</label>
+              <input name="responsavel_nome" placeholder="Nome completo" ${minor ? "required" : ""} value="${escapeHtml(formValues.responsavel_nome || "")}">
+            </div>
+            <div class="field">
+              <label id="guardianTelLabel">${escapeHtml(guardianLabels.tel)}</label>
+              <input name="responsavel_telefone" placeholder="(00) 90000-0000" ${minor ? "required" : ""} value="${escapeHtml(formValues.responsavel_telefone || "")}">
+            </div>
+          </div>
           <button type="submit" class="btn btn-primary">Confirmar minha inscrição</button>
         </form>
       </div>
@@ -110,10 +127,32 @@ function renderRegisterForm(errorMsg = "") {
 
   const birthInput = root.querySelector('[name="data_nascimento"]');
   const guardianWarn = root.querySelector("#guardianWarn");
-  birthInput.addEventListener("change", () => {
-    guardianWarn.classList.toggle("hidden", !isMinor(birthInput.value));
-  });
-  birthInput.dispatchEvent(new Event("change"));
+  const guardianSection = root.querySelector("#guardianSection");
+  const guardianCaptionEl = root.querySelector("#guardianCaption");
+  const guardianNomeLabel = root.querySelector("#guardianNomeLabel");
+  const guardianTelLabel = root.querySelector("#guardianTelLabel");
+  const guardianNomeInput = root.querySelector('[name="responsavel_nome"]');
+  const guardianTelInput = root.querySelector('[name="responsavel_telefone"]');
+
+  function syncGuardianFields() {
+    const needsGuardian = isMinor(birthInput.value);
+    guardianWarn.classList.toggle("hidden", !needsGuardian);
+    guardianSection.classList.toggle("guardian-required", needsGuardian);
+    guardianCaptionEl.textContent = needsGuardian
+      ? "Campos obrigatórios para menores de idade."
+      : "Opcional. Obrigatório apenas para participantes menores de 18 anos.";
+    guardianNomeLabel.textContent = needsGuardian ? "Nome do Responsável *" : "Nome do Responsável";
+    guardianTelLabel.textContent = needsGuardian ? "Telefone do Responsável *" : "Telefone do Responsável";
+    guardianNomeInput.required = needsGuardian;
+    guardianTelInput.required = needsGuardian;
+    if (!needsGuardian) {
+      guardianNomeInput.setCustomValidity("");
+      guardianTelInput.setCustomValidity("");
+    }
+  }
+
+  birthInput.addEventListener("input", syncGuardianFields);
+  birthInput.addEventListener("change", syncGuardianFields);
 
   root.querySelector("#backHome").onclick = () => renderHome();
   root.querySelector("#regForm").onsubmit = async (e) => {
@@ -121,15 +160,19 @@ function renderRegisterForm(errorMsg = "") {
     const fd = new FormData(e.target);
     const payload = {
       evento_id: ev.id,
-      nome: fd.get("nome"),
-      data_nascimento: fd.get("data_nascimento"),
-      whatsapp: fd.get("whatsapp"),
-      igreja: fd.get("igreja"),
-      responsavel_nome: fd.get("responsavel_nome"),
-      responsavel_telefone: fd.get("responsavel_telefone"),
+      nome: trimOrEmpty(fd.get("nome")),
+      data_nascimento: String(fd.get("data_nascimento") || "").slice(0, 10),
+      whatsapp: trimOrEmpty(fd.get("whatsapp")),
+      igreja: trimOrEmpty(fd.get("igreja")),
+      responsavel_nome: trimOrEmpty(fd.get("responsavel_nome")),
+      responsavel_telefone: trimOrEmpty(fd.get("responsavel_telefone")),
     };
+    if (!payload.nome || !payload.whatsapp || !payload.igreja || !payload.data_nascimento) {
+      renderRegisterForm("Por favor, preencha todos os campos obrigatórios (*).", payload);
+      return;
+    }
     if (isMinor(payload.data_nascimento) && (!payload.responsavel_nome || !payload.responsavel_telefone)) {
-      renderRegisterForm("Menores de 18 anos devem informar nome e telefone do responsável.");
+      renderRegisterForm("Menores de 18 anos devem informar nome e telefone do responsável.", payload);
       return;
     }
     const btn = e.target.querySelector("button");
@@ -137,8 +180,8 @@ function renderRegisterForm(errorMsg = "") {
     btn.textContent = "Salvando...";
     try {
       const result = await createOrUpdateRegistration(payload);
-      if (!result.ok) {
-        renderRegisterForm(result.error);
+      if (!result?.ok) {
+        renderRegisterForm(result?.error || "Não foi possível salvar a inscrição.", payload);
         return;
       }
       state.registrationId = result.id;
@@ -150,7 +193,7 @@ function renderRegisterForm(errorMsg = "") {
         await renderSummary();
       }
     } catch (err) {
-      renderRegisterForm(err.message || "Erro ao salvar inscrição.");
+      renderRegisterForm(err.message || "Erro ao salvar inscrição.", payload);
     }
   };
 }

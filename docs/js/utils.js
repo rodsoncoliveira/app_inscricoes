@@ -18,12 +18,21 @@ export function formatDateTimeBR(iso) {
 }
 
 export function isMinor(isoDate) {
-  const birth = new Date(isoDate + "T12:00:00");
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const m = today.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  if (!isoDate) return false;
+  const datePart = String(isoDate).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return false;
+
+  const [y, m, d] = datePart.split("-").map(Number);
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const [ty, tm, td] = todayStr.split("-").map(Number);
+
+  let age = ty - y;
+  if (tm < m || (tm === m && td < d)) age -= 1;
   return age < 18;
+}
+
+export function trimOrEmpty(value) {
+  return String(value ?? "").trim();
 }
 
 export function normalizeName(name) {
