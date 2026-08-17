@@ -5,8 +5,8 @@ import {
   createOrUpdateRegistration,
   updateRegistrationWorkshops,
   getRegistrationSummary,
-} from "./api.js?v=5";
-import { escapeHtml, formatDateBR, isMinor, trimOrEmpty, resolveBanner, renderSiteHeader, showError } from "./utils.js?v=5";
+} from "./api.js?v=6";
+import { escapeHtml, formatDateBR, isMinor, trimOrEmpty, resolveBanner, renderSiteHeader, showError } from "./utils.js?v=6";
 
 const root = document.getElementById("app");
 
@@ -221,7 +221,6 @@ function renderWorkshops(workshops, errorMsg = "") {
           <button type="submit" class="btn btn-primary">Confirmar oficinas</button>
         </form>
       </div>
-      ${whatsappBlock(ev)}
     </div>`;
 
   root.querySelector("#wsForm").onsubmit = async (e) => {
@@ -241,11 +240,53 @@ function renderWorkshops(workshops, errorMsg = "") {
         renderWorkshops(workshops, result.error);
         return;
       }
+      const whatsappUrl = (ev.whatsapp_grupo_url || "").trim();
+      if (whatsappUrl) {
+        await showWhatsAppPopup(whatsappUrl);
+      }
       await renderSummary();
     } catch (err) {
       renderWorkshops(workshops, err.message);
     }
   };
+}
+
+function showWhatsAppPopup(url) {
+  return new Promise((resolve) => {
+    let overlay = document.getElementById("whatsappModal");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "whatsappModal";
+      overlay.className = "modal-overlay hidden";
+      overlay.innerHTML = `
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="whatsappModalTitle">
+          <h3 id="whatsappModalTitle">📱 Entre no grupo do WhatsApp</h3>
+          <p>Avisos e novidades do congresso. Toque abaixo para participar.</p>
+          <a class="btn-whatsapp" id="whatsappModalJoin" href="#" target="_blank" rel="noopener">Entrar no grupo</a>
+          <button type="button" class="btn-later" id="whatsappModalLater">Agora não</button>
+        </div>`;
+      document.body.appendChild(overlay);
+    }
+
+    const joinBtn = overlay.querySelector("#whatsappModalJoin");
+    const laterBtn = overlay.querySelector("#whatsappModalLater");
+    joinBtn.href = url;
+
+    const close = () => {
+      overlay.classList.add("hidden");
+      resolve();
+    };
+
+    joinBtn.onclick = () => {
+      close();
+    };
+    laterBtn.onclick = close;
+    overlay.onclick = (event) => {
+      if (event.target === overlay) close();
+    };
+
+    overlay.classList.remove("hidden");
+  });
 }
 
 function whatsappBlock(ev) {
