@@ -51,6 +51,66 @@ header.site-header p {
   font-size: 0.95rem;
 }
 
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 28px;
+}
+
+.logo-left,
+.logo-right {
+  height: 64px;
+  width: auto;
+  max-width: 28%;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.header-title-wrapper {
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+}
+
+.header-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.header-subtitle {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .header-container {
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+
+  .logo-left,
+  .logo-right {
+    height: 48px;
+    max-width: 42%;
+  }
+
+  .header-title {
+    font-size: 1.15rem;
+  }
+}
+
 .card {
   background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
   border: 1px solid var(--line);

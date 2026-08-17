@@ -50,6 +50,18 @@ export function resolveBanner(path) {
   return clean;
 }
 
+export function renderSiteHeader(title, subtitle = "") {
+  return `
+    <div class="header-container">
+      <img class="logo-left" src="image/LogoNextGen_nobg.png" alt="NextGen">
+      <div class="header-title-wrapper">
+        <h1 class="header-title">${escapeHtml(title)}</h1>
+        ${subtitle ? `<p class="header-subtitle">${escapeHtml(subtitle)}</p>` : ""}
+      </div>
+      <img class="logo-right" src="image/HOPE_nobg.png" alt="Hope">
+    </div>`;
+}
+
 export function showError(root, msg) {
   root.innerHTML = `<div class="wrap"><div class="alert alert-error">${escapeHtml(msg)}</div>
     <p class="footer-link">Configure <code>docs/js/config.js</code> (veja config.example.js e DEPLOY.md).</p></div>`;

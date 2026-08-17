@@ -31,11 +31,13 @@ Se aparecer *Invalid API key*, use a chave **anon** legacy (JWT `eyJ...`) em **S
 
 > A publishable/anon key é pública (vai no HTML). A segurança vem das **RLS policies** em `browser_api.sql`.
 
-## 4. Banners
+## 4. Banners e imagens
 
-Copie imagens de banner para `docs/image/` e mantenha em `eventos.banner_path` caminhos como `image/nome.jpg`.
+Arquivos estáticos do site ficam em **`docs/image/`** (não em `image/` na raiz).
 
-Ou use URL completa (`https://...`) no campo `banner_path`.
+- Banners de evento: mantenha em `eventos.banner_path` caminhos como `image/nome.jpg` **desde que o arquivo exista em `docs/image/`**
+- Banners enviados pelo admin Streamlit (`image/banner_*`) **não vão automaticamente** para o GitHub Pages — copie o arquivo para `docs/image/` com o mesmo nome do banco, ou use URL completa (`https://...`) em `banner_path`
+- Logos do cabeçalho: `docs/image/LogoNextGen_nobg.png` e `docs/image/HOPE_nobg.png`
 
 ## 5. Publicar o site (sempre ativo)
 

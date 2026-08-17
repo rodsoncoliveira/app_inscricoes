@@ -6,7 +6,7 @@ import {
   updateRegistrationWorkshops,
   getRegistrationSummary,
 } from "./api.js";
-import { escapeHtml, formatDateBR, isMinor, resolveBanner, showError } from "./utils.js";
+import { escapeHtml, formatDateBR, isMinor, resolveBanner, renderSiteHeader, showError } from "./utils.js";
 
 const root = document.getElementById("app");
 
@@ -36,10 +36,7 @@ async function renderHome() {
   if (events.length === 0) {
     root.innerHTML = `
       <div class="wrap">
-        <header class="site-header">
-          <h1>Portal de Inscrições</h1>
-          <p>NextGen</p>
-        </header>
+        ${renderSiteHeader("Portal de Inscrições", "NextGen")}
         <div class="alert alert-info">No momento não há eventos com inscrições abertas. Volte em breve!</div>
         <p class="footer-link"><a href="admin.html">Área administrativa</a></p>
       </div>`;
@@ -64,10 +61,7 @@ async function renderHome() {
 
   root.innerHTML = `
     <div class="wrap">
-      <header class="site-header">
-        <h1>Portal de Inscrições</h1>
-        <p>Clique no evento desejado para realizar sua inscrição</p>
-      </header>
+      ${renderSiteHeader("Portal de Inscrições", "Clique no evento desejado para realizar sua inscrição")}
       ${cards}
       <p class="footer-link"><a href="admin.html">Área administrativa</a></p>
     </div>`;
@@ -93,10 +87,7 @@ function renderRegisterForm(errorMsg = "") {
   const banner = resolveBanner(ev.banner_path);
   root.innerHTML = `
     <div class="wrap">
-      <header class="site-header">
-        <h1>${escapeHtml(ev.nome)}</h1>
-        <p>${formatDateBR(ev.data_inicio)} a ${formatDateBR(ev.data_fim)}</p>
-      </header>
+      ${renderSiteHeader(ev.nome, `${formatDateBR(ev.data_inicio)} a ${formatDateBR(ev.data_fim)}`)}
       ${banner ? `<img class="banner card" src="${escapeHtml(banner)}" alt="" style="width:100%;margin-bottom:16px;border-radius:12px">` : ""}
       <div class="card">
         <h2>Formulário de Inscrição</h2>
