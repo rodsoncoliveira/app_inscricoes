@@ -11,13 +11,17 @@ Inscrições em eventos com oficinas, painel admin e dashboard.
 
 ## Site sempre ativo (GitHub Pages)
 
+**URL:** https://hopenextgen.github.io/app_inscricoes/
+
+Repositório: [github.com/hopenextgen/app_inscricoes](https://github.com/hopenextgen/app_inscricoes)
+
 Siga o guia completo: **[DEPLOY.md](DEPLOY.md)**
 
 Resumo:
 
 1. Executar `supabase/browser_api.sql` no Supabase  
 2. Criar usuário admin em **Authentication → Users**  
-3. Preencher `docs/js/config.js` com a **anon key**  
+3. Preencher `docs/js/config.js` com a **publishable key** (ou anon legacy)  
 4. Publicar `docs/` — GitHub Pages (repo **público**). Ver **[DEPLOY.md](DEPLOY.md)**
 
 ## Streamlit (legado / backup)

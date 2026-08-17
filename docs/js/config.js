@@ -1,5 +1,5 @@
 /**
- * Chaves públicas do Supabase (anon key pode ir no GitHub — proteção via RLS).
+ * Chaves públicas do Supabase (publishable ou anon — proteção via RLS).
  * Obtenha em: Supabase → Settings → API
  */
 window.APP_CONFIG = {
