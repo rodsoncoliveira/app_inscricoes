@@ -25,9 +25,11 @@ cp docs/js/config.example.js docs/js/config.js
 Edite `docs/js/config.js`:
 
 - **SUPABASE_URL** — Settings → API → Project URL  
-- **SUPABASE_ANON_KEY** — Settings → API → `anon` `public`
+- **SUPABASE_ANON_KEY** — Settings → API → **Publishable key** (`sb_publishable_...`)
 
-> A anon key é pública (vai no HTML). A segurança vem das **RLS policies** em `browser_api.sql`.
+Se aparecer *Invalid API key*, use a chave **anon** legacy (JWT `eyJ...`) em **Settings → API → Legacy API Keys**.
+
+> A publishable/anon key é pública (vai no HTML). A segurança vem das **RLS policies** em `browser_api.sql`.
 
 ## 4. Banners
 
