@@ -16,9 +16,13 @@ export function getSupabase() {
   return client;
 }
 
+function todayBR() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
 export async function getActiveEvents() {
   const sb = getSupabase();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayBR();
   const { data, error } = await sb
     .from("eventos")
     .select("*")
