@@ -5,8 +5,8 @@ import {
   createOrUpdateRegistration,
   updateRegistrationWorkshops,
   getRegistrationSummary,
-} from "./api.js?v=11";
-import { escapeHtml, formatDateBR, isMinor, todayBR, trimOrEmpty, bannerSrc, renderSiteHeader, showError } from "./utils.js?v=11";
+} from "./api.js?v=12";
+import { escapeHtml, formatDateBR, isMinor, todayBR, trimOrEmpty, bannerSrc, renderSiteHeader, showError } from "./utils.js?v=12";
 
 const root = document.getElementById("app");
 

@@ -97,7 +97,7 @@ export function renderSiteHeader(title, subtitle = "") {
         <h1 class="header-title">${escapeHtml(title)}</h1>
         ${subtitle ? `<p class="header-subtitle">${escapeHtml(subtitle)}</p>` : ""}
       </div>
-      <img class="logo-right" src="image/HOPE_nobg.png" alt="Hope">
+      <img class="logo-right" src="image/HOPE_nobg.jpg?v=1" alt="Hope">
     </div>`;
 }
 

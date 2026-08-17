@@ -16,7 +16,7 @@ import {
   deleteEvent,
   uploadEventBanner,
   deleteEventBanner,
-} from "./api.js?v=11";
+} from "./api.js?v=12";
 import {
   escapeHtml,
   formatDateBR,
@@ -28,7 +28,7 @@ import {
   normalizeWhatsappUrl,
   todayBR,
   bannerSrc,
-} from "./utils.js?v=11";
+} from "./utils.js?v=12";
 
 const root = document.getElementById("admin-app");
 let tab = "dashboard";

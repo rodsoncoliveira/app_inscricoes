@@ -42,7 +42,7 @@ No painel **Eventos**, envie JPG/PNG (até 5 MB). A imagem vai para o **Supabase
 
 Logos e banners fixos do repositório ficam em **`docs/image/`**:
 
-- Logos do cabeçalho: `docs/image/LogoNextGen_nobg.png` e `docs/image/HOPE_nobg.png`
+- Logos do cabeçalho: `docs/image/LogoNextGen_nobg.png` e `docs/image/HOPE_nobg.jpg`
 - Banners legados: caminhos como `image/nome.jpg` **desde que o arquivo exista em `docs/image/`**
 - URLs completas (`https://...`) em `banner_path` também funcionam
 
