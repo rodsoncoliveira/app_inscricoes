@@ -5,8 +5,8 @@ import {
   createOrUpdateRegistration,
   updateRegistrationWorkshops,
   getRegistrationSummary,
-} from "./api.js?v=6";
-import { escapeHtml, formatDateBR, isMinor, trimOrEmpty, resolveBanner, renderSiteHeader, showError } from "./utils.js?v=6";
+} from "./api.js?v=7";
+import { escapeHtml, formatDateBR, isMinor, trimOrEmpty, resolveBanner, renderSiteHeader, showError } from "./utils.js?v=7";
 
 const root = document.getElementById("app");
 
@@ -188,9 +188,9 @@ function renderRegisterForm(errorMsg = "", formValues = {}) {
       state.action = result.action;
       const workshops = await getWorkshopsVagas(ev.id);
       if (workshops.length > 0) {
-        renderWorkshops(workshops);
+        renderWorkshops(workshops, "", result.action);
       } else {
-        await renderSummary();
+        await renderSummary(result.action);
       }
     } catch (err) {
       renderRegisterForm(err.message || "Erro ao salvar inscrição.", payload);
@@ -198,8 +198,11 @@ function renderRegisterForm(errorMsg = "", formValues = {}) {
   };
 }
 
-function renderWorkshops(workshops, errorMsg = "") {
+function renderWorkshops(workshops, errorMsg = "", action = state.action) {
   const ev = state.event;
+  const successMsg = action === "updated"
+    ? "✅ Inscrição atualizada! Escolha ou revise suas oficinas."
+    : "🎉 Inscrição confirmada! Escolha sua oficina.";
   const options = workshops.map((w) => {
     const soldOut = w.vagas_restantes <= 0;
     const label = soldOut
@@ -210,7 +213,7 @@ function renderWorkshops(workshops, errorMsg = "") {
 
   root.innerHTML = `
     <div class="wrap">
-      <div class="alert alert-success">🎉 Inscrição confirmada! Escolha sua oficina.</div>
+      <div class="alert alert-success">${successMsg}</div>
       <div class="card">
         <h2>Escolha suas oficinas</h2>
         <p>Até 2 oficinas opcionais. Vagas limitadas.</p>
@@ -300,15 +303,18 @@ function whatsappBlock(ev) {
     </div>`;
 }
 
-async function renderSummary() {
+async function renderSummary(action = state.action) {
   const summary = await getRegistrationSummary(state.registrationId);
   const workshops = [];
   if (summary.oficina_nome) workshops.push(`${summary.oficina_nome} (${summary.oficina_preletor || ""})`);
   if (summary.oficina_nome_2) workshops.push(`${summary.oficina_nome_2} (${summary.oficina_preletor_2 || ""})`);
+  const successMsg = action === "updated"
+    ? "✅ Inscrição atualizada! Confira o resumo abaixo."
+    : "✅ Inscrição concluída! Confira o resumo abaixo.";
 
   root.innerHTML = `
     <div class="wrap">
-      <div class="alert alert-success">✅ Inscrição concluída! Confira o resumo abaixo.</div>
+      <div class="alert alert-success">${successMsg}</div>
       <div class="card">
         <h2>Resumo da inscrição</h2>
         <ul class="summary-list">

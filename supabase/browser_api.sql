@@ -2,6 +2,7 @@
 -- Execute no Supabase SQL Editor após o schema principal.
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS unaccent;
 
 -- ---------------------------------------------------------------------------
 -- RLS
@@ -67,6 +68,22 @@ LANGUAGE sql
 STABLE
 AS $$
     SELECT EXTRACT(YEAR FROM age(CURRENT_DATE, p_data_nascimento)) < 18;
+$$;
+
+CREATE OR REPLACE FUNCTION public.normalize_inscricao_nome(p_nome text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $$
+    SELECT trim(
+        regexp_replace(
+            regexp_replace(
+                lower(unaccent(trim(coalesce(p_nome, '')))),
+                '[^a-z0-9\s]', ' ', 'g'
+            ),
+            '\s+', ' ', 'g'
+        )
+    );
 $$;
 
 CREATE OR REPLACE FUNCTION public.evento_aceita_inscricao(p_evento_id integer)
@@ -173,8 +190,14 @@ BEGIN
     FROM inscricoes i
     WHERE i.evento_id = p_evento_id
       AND i.data_nascimento = p_data_nascimento
-      AND similarity(lower(i.nome), lower(p_nome)) >= 0.88
-    ORDER BY similarity(lower(i.nome), lower(p_nome)) DESC
+      AND similarity(
+        public.normalize_inscricao_nome(i.nome),
+        public.normalize_inscricao_nome(p_nome)
+      ) >= 0.88
+    ORDER BY similarity(
+        public.normalize_inscricao_nome(i.nome),
+        public.normalize_inscricao_nome(p_nome)
+      ) DESC
     LIMIT 1;
 
     IF FOUND THEN
