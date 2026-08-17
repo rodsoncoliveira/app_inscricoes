@@ -6,7 +6,7 @@ Inscrições em eventos com oficinas, painel admin e dashboard.
 
 | Versão | Onde | Hibernação |
 |--------|------|------------|
-| **Site estático** (`docs/`) | GitHub Pages | Não |
+| **Site estático** (`docs/`) | GitHub Pages / Cloudflare / Netlify | Não |
 | **Streamlit** (`app.py`) | Streamlit Cloud | Sim (plano grátis) |
 
 ## Site sempre ativo (GitHub Pages)
@@ -18,7 +18,7 @@ Resumo:
 1. Executar `supabase/browser_api.sql` no Supabase  
 2. Criar usuário admin em **Authentication → Users**  
 3. Preencher `docs/js/config.js` com a **anon key**  
-4. GitHub → **Settings → Pages** → pasta **`/docs`**
+4. Publicar `docs/` — GitHub Pages (repo **público**) ou Cloudflare/Netlify (repo privado OK). Ver **[docs/DEPLOY.md](docs/DEPLOY.md)**
 
 ## Streamlit (legado / backup)
 

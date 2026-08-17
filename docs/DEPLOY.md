@@ -35,13 +35,35 @@ Copie imagens de banner para `docs/image/` e mantenha em `eventos.banner_path` c
 
 Ou use URL completa (`https://...`) no campo `banner_path`.
 
-## 5. GitHub Pages
+## 5. Publicar o site (sempre ativo)
 
-1. Repositório → **Settings → Pages**
-2. **Source:** Deploy from a branch  
-3. **Branch:** `main`  
-4. **Folder:** `/docs`  
-5. Salvar — em ~2 min: `https://SEU_USUARIO.github.io/app_inscricoes/`
+### Opção A — GitHub Pages (repositório **público**)
+
+No plano gratuito, GitHub Pages **não funciona em repositório privado**.
+
+1. Repositório → **Settings → General → Danger Zone → Change visibility → Public**
+2. **Settings → Pages**
+3. **Source:** Deploy from a branch  
+4. **Branch:** `main`  
+5. **Folder:** `/docs`  
+6. Salvar — em ~2 min: `https://rodsoncoliveira.github.io/app_inscricoes/`
+
+> A anon key no `config.js` é pública por design; o banco fica protegido por RLS.
+
+### Opção B — Cloudflare Pages (repo pode continuar privado)
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages → Create → Pages → Connect to Git**
+2. Autorize o GitHub e selecione `app_inscricoes`
+3. **Build command:** (vazio)  
+4. **Build output directory:** `docs`  
+5. Deploy — URL tipo `https://app-inscricoes.pages.dev`
+
+### Opção C — Netlify (repo privado OK no plano grátis)
+
+1. [app.netlify.com](https://app.netlify.com) → **Add new site → Import an existing project**
+2. Conecte o GitHub, branch `main`
+3. **Publish directory:** `docs`  
+4. Deploy
 
 ## 6. URLs
 
