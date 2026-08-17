@@ -28,7 +28,7 @@ import {
   normalizeWhatsappUrl,
   todayBR,
   bannerSrc,
-} from "./utils.js?v=12";
+} from "./utils.js?v=13";
 
 const root = document.getElementById("admin-app");
 let tab = "dashboard";
