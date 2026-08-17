@@ -38,6 +38,26 @@ export function trimOrEmpty(value) {
   return String(value ?? "").trim();
 }
 
+export function digitsOnly(value) {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+export function bindNumericPhoneInput(input) {
+  if (!input) return;
+  const clean = () => {
+    const next = digitsOnly(input.value);
+    if (input.value !== next) input.value = next;
+  };
+  input.addEventListener("input", clean);
+  input.addEventListener("paste", (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData?.getData("text") || "";
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    input.value = digitsOnly(`${input.value.slice(0, start)}${pasted}${input.value.slice(end)}`);
+  });
+}
+
 export function normalizeWhatsappUrl(url) {
   if (!url) return "";
   let normalized = String(url).trim();

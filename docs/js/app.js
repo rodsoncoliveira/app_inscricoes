@@ -6,7 +6,7 @@ import {
   updateRegistrationWorkshops,
   getRegistrationSummary,
 } from "./api.js?v=12";
-import { escapeHtml, formatDateBR, isMinor, todayBR, trimOrEmpty, bannerSrc, renderSiteHeader, showError } from "./utils.js?v=13";
+import { escapeHtml, formatDateBR, isMinor, todayBR, trimOrEmpty, digitsOnly, bindNumericPhoneInput, bannerSrc, renderSiteHeader, showError } from "./utils.js?v=14";
 
 const root = document.getElementById("app");
 
@@ -109,11 +109,11 @@ function renderRegisterForm(errorMsg = "", formValues = {}) {
             </div>
             <div class="field" id="guardianTelField">
               <label id="guardianTelLabel">${minor ? "Telefone do Responsável *" : "Telefone do Responsável"}</label>
-              <input name="responsavel_telefone" placeholder="(00) 90000-0000" value="${escapeHtml(formValues.responsavel_telefone || "")}">
+              <input name="responsavel_telefone" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="tel" maxlength="15" placeholder="11999998888" value="${escapeHtml(digitsOnly(formValues.responsavel_telefone || ""))}">
             </div>
           </div>
 
-          <div class="field"><label>WhatsApp *</label><input name="whatsapp" required placeholder="(00) 90000-0000" value="${escapeHtml(formValues.whatsapp || "")}"></div>
+          <div class="field"><label>WhatsApp *</label><input name="whatsapp" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="tel" maxlength="15" required placeholder="11999998888" value="${escapeHtml(digitsOnly(formValues.whatsapp || ""))}"></div>
           <div class="field"><label>Igreja / Congregação *</label><input name="igreja" required placeholder="Ex: Comunidade Hope" value="${escapeHtml(formValues.igreja || "")}"></div>
           <button type="submit" class="btn btn-primary">Confirmar minha inscrição</button>
         </form>
@@ -130,6 +130,9 @@ function renderRegisterForm(errorMsg = "", formValues = {}) {
   const guardianTelLabel = root.querySelector("#guardianTelLabel");
   const guardianNomeInput = root.querySelector('[name="responsavel_nome"]');
   const guardianTelInput = root.querySelector('[name="responsavel_telefone"]');
+  const whatsappInput = root.querySelector('[name="whatsapp"]');
+  bindNumericPhoneInput(guardianTelInput);
+  bindNumericPhoneInput(whatsappInput);
 
   function syncGuardianFields() {
     const needsGuardian = isMinor(birthInput.value);
@@ -169,10 +172,10 @@ function renderRegisterForm(errorMsg = "", formValues = {}) {
       evento_id: ev.id,
       nome: trimOrEmpty(fd.get("nome")),
       data_nascimento: String(fd.get("data_nascimento") || "").slice(0, 10),
-      whatsapp: trimOrEmpty(fd.get("whatsapp")),
+      whatsapp: digitsOnly(fd.get("whatsapp")),
       igreja: trimOrEmpty(fd.get("igreja")),
       responsavel_nome: trimOrEmpty(fd.get("responsavel_nome")),
-      responsavel_telefone: trimOrEmpty(fd.get("responsavel_telefone")),
+      responsavel_telefone: digitsOnly(fd.get("responsavel_telefone")),
     };
 
     if (!payload.nome || !payload.whatsapp || !payload.igreja || !payload.data_nascimento) {
