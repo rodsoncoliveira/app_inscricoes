@@ -37,18 +37,11 @@ Ou use URL completa (`https://...`) no campo `banner_path`.
 
 ## 5. Publicar o site (sempre ativo)
 
-### Opção A — GitHub Pages (repositório **público**)
+### Opção A — GitHub Pages (repositório **público**) ✅ configurado
 
-No plano gratuito, GitHub Pages **não funciona em repositório privado**.
+Repositório público, branch `main`, pasta `/docs`.
 
-1. Repositório → **Settings → General → Danger Zone → Change visibility → Public**
-2. **Settings → Pages**
-3. **Source:** Deploy from a branch  
-4. **Branch:** `main`  
-5. **Folder:** `/docs`  
-6. Salvar — em ~2 min: `https://rodsoncoliveira.github.io/app_inscricoes/`
-
-> A anon key no `config.js` é pública por design; o banco fica protegido por RLS.
+URL: **https://hopenextgen.github.io/app_inscricoes/**
 
 ### Opção B — Cloudflare Pages (repo pode continuar privado)
 
