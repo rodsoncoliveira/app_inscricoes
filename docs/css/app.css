@@ -233,8 +233,18 @@ header.site-header p {
   border: 1px solid rgba(255, 87, 51, 0.35);
   border-radius: 12px;
   padding: 12px 14px 4px;
-  margin-top: 8px;
+  margin: 12px 0 16px;
   background: rgba(255, 87, 51, 0.06);
+}
+
+.guardian-section.hidden-guardian {
+  display: none;
+}
+
+.field-invalid input:invalid,
+.field-invalid input.field-error {
+  border-color: #f87171;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.45);
 }
 
 .whatsapp-cta {
