@@ -5,7 +5,7 @@ import {
   createOrUpdateRegistration,
   updateRegistrationWorkshops,
   getRegistrationSummary,
-} from "./api.js?v=12";
+} from "./api.js?v=14";
 import { escapeHtml, formatDateBR, isMinor, todayBR, trimOrEmpty, digitsOnly, bindNumericPhoneInput, bannerSrc, renderSiteHeader, showError } from "./utils.js?v=14";
 
 const root = document.getElementById("app");
