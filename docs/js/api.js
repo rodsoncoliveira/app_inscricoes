@@ -159,6 +159,61 @@ export async function createWorkshopCatalog(nome, preletor) {
   return data;
 }
 
+export async function updateWorkshopCatalog(id, nome, preletor) {
+  const sb = getSupabase();
+  const { error } = await sb.from("oficinas").update({
+    nome: String(nome || "").trim(),
+    preletor: String(preletor || "").trim(),
+  }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteWorkshop(id) {
+  const sb = getSupabase();
+  const { error } = await sb.from("oficinas").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function getWorkshopEventLinks(oficinaId) {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("evento_oficinas")
+    .select("evento_id, eventos(nome)")
+    .eq("oficina_id", oficinaId);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getWorkshopEventLink(eventoId, oficinaId) {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("evento_oficinas")
+    .select("evento_id, oficina_id, vagas, preletor, oficinas(nome, preletor)")
+    .eq("evento_id", eventoId)
+    .eq("oficina_id", oficinaId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateEventWorkshopLink(eventoId, oficinaId, vagas, preletor) {
+  const sb = getSupabase();
+  const preletorVal = String(preletor ?? "").trim() || null;
+  const { error } = await sb.from("evento_oficinas").update({
+    vagas: Number(vagas),
+    preletor: preletorVal,
+  }).eq("evento_id", eventoId).eq("oficina_id", oficinaId);
+  if (error) throw error;
+}
+
+export async function unlinkWorkshopFromEvent(eventoId, oficinaId) {
+  const sb = getSupabase();
+  const { error } = await sb.from("evento_oficinas").delete()
+    .eq("evento_id", eventoId)
+    .eq("oficina_id", oficinaId);
+  if (error) throw error;
+}
+
 function eventPayloadFromForm(fd) {
   return {
     nome: String(fd.get("nome") || "").trim(),

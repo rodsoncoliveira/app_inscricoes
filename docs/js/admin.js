@@ -11,12 +11,18 @@ import {
   getAllWorkshops,
   linkWorkshop,
   createWorkshopCatalog,
+  updateWorkshopCatalog,
+  deleteWorkshop,
+  getWorkshopEventLinks,
+  getWorkshopEventLink,
+  updateEventWorkshopLink,
+  unlinkWorkshopFromEvent,
   createEvent,
   updateEvent,
   deleteEvent,
   uploadEventBanner,
   deleteEventBanner,
-} from "./api.js?v=12";
+} from "./api.js?v=15";
 import {
   escapeHtml,
   formatDateBR,
@@ -34,6 +40,8 @@ const root = document.getElementById("admin-app");
 let tab = "dashboard";
 let selectedEventId = null;
 let editingEventId = null;
+let editingWorkshopId = null;
+let editingEventWorkshopLink = null;
 
 function renderLogin(msg = "") {
   root.innerHTML = `
@@ -194,13 +202,90 @@ async function renderOficinas(events) {
   if (!selectedEventId && events[0]) selectedEventId = events[0].id;
   const [catalog, linked] = await Promise.all([
     getAllWorkshops(),
-    getWorkshopsVagas(selectedEventId),
+    selectedEventId ? getWorkshopsVagas(selectedEventId) : Promise.resolve([]),
   ]);
   const linkedIds = new Set(linked.map((w) => w.id));
   const available = catalog.filter((w) => !linkedIds.has(w.id));
 
+  let editCatalogBlock = "";
+  if (editingWorkshopId) {
+    const workshop = catalog.find((w) => w.id === editingWorkshopId);
+    if (!workshop) {
+      editingWorkshopId = null;
+    } else {
+      const links = await getWorkshopEventLinks(editingWorkshopId);
+      const linksHint = links.length
+        ? `<p class="field-hint">Usada em: ${escapeHtml(links.map((l) => l.eventos?.nome || "Evento").join(", "))}</p>`
+        : "";
+      editCatalogBlock = `
+        <div class="card">
+          <h3>✏️ Editar oficina: ${escapeHtml(workshop.nome)}</h3>
+          ${linksHint}
+          <form id="editCatalogForm">
+            <div class="field"><label>Nome</label><input name="nome" required value="${escapeHtml(workshop.nome)}"></div>
+            <div class="field"><label>Preletor</label><input name="preletor" required value="${escapeHtml(workshop.preletor)}"></div>
+            <div class="btn-row">
+              <button class="btn btn-primary" type="submit">Salvar</button>
+              <button class="btn btn-secondary" type="button" data-action="cancel-catalog-edit">Cancelar</button>
+            </div>
+          </form>
+        </div>`;
+    }
+  }
+
+  let editLinkBlock = "";
+  if (editingEventWorkshopLink?.eventoId === selectedEventId) {
+    const link = await getWorkshopEventLink(selectedEventId, editingEventWorkshopLink.oficinaId);
+    if (!link) {
+      editingEventWorkshopLink = null;
+    } else {
+      const defaultPreletor = link.preletor || link.oficinas?.preletor || "";
+      editLinkBlock = `
+        <div class="card">
+          <h3>✏️ Ajustar: ${escapeHtml(link.oficinas?.nome || "Oficina")}</h3>
+          <form id="editLinkForm">
+            <div class="form-grid-2">
+              <div class="field"><label>Vagas</label><input name="vagas" type="number" min="1" required value="${Number(link.vagas)}"></div>
+              <div class="field"><label>Preletor neste evento</label><input name="preletor" value="${escapeHtml(defaultPreletor)}" placeholder="Opcional"></div>
+            </div>
+            <p class="field-hint">Deixe o preletor em branco para usar o do catálogo (${escapeHtml(link.oficinas?.preletor || "—")}).</p>
+            <div class="btn-row">
+              <button class="btn btn-primary" type="submit">Salvar</button>
+              <button class="btn btn-secondary" type="button" data-action="cancel-link-edit">Cancelar</button>
+            </div>
+          </form>
+        </div>`;
+    }
+  }
+
+  const linkedHtml = linked.length
+    ? linked.map((w) => `
+        <div class="card" style="margin-bottom:10px;padding:14px">
+          <p style="margin:0 0 4px"><strong>${escapeHtml(w.nome)}</strong></p>
+          <p style="margin:0 0 8px;color:var(--muted)">${escapeHtml(w.preletor)} · ${w.vagas_ocupadas}/${w.vagas_totais} vagas (${w.vagas_restantes} restantes)</p>
+          <div class="btn-row" style="margin-top:0">
+            <button class="btn btn-secondary" data-edit-link="${w.id}">Ajustar</button>
+            <button class="btn btn-secondary" data-unlink="${w.id}">Remover do evento</button>
+          </div>
+        </div>`).join("")
+    : "<p style='color:var(--muted)'>Nenhuma oficina vinculada a este evento.</p>";
+
+  const catalogHtml = catalog.length
+    ? catalog.map((w) => `
+        <div class="card" style="margin-bottom:10px;padding:14px">
+          <p style="margin:0 0 4px"><strong>${escapeHtml(w.nome)}</strong></p>
+          <p style="margin:0 0 8px;color:var(--muted)">${escapeHtml(w.preletor)}</p>
+          <div class="btn-row" style="margin-top:0">
+            <button class="btn btn-secondary" data-edit-catalog="${w.id}">Editar</button>
+            <button class="btn btn-secondary" data-del-catalog="${w.id}">Excluir</button>
+          </div>
+        </div>`).join("")
+    : "<p style='color:var(--muted)'>Catálogo vazio.</p>";
+
   root.innerHTML = shell(`
     <div class="field"><label>Evento</label><select id="eventSelect">${events.map((e) => `<option value="${e.id}" ${e.id === selectedEventId ? "selected" : ""}>${escapeHtml(e.nome)}</option>`).join("")}</select></div>
+    ${editLinkBlock}
+    ${editCatalogBlock}
     <div class="card">
       <h3>Vincular oficina do catálogo</h3>
       <form id="linkForm" class="${available.length ? "" : "hidden"}">
@@ -221,15 +306,105 @@ async function renderOficinas(events) {
     </div>
     <div class="card">
       <h3>Oficinas deste evento (${linked.length})</h3>
-      ${linked.map((w) => `<p><strong>${escapeHtml(w.nome)}</strong> — ${w.vagas_ocupadas}/${w.vagas_totais} vagas</p>`).join("") || "<p style='color:var(--muted)'>Nenhuma</p>"}
+      ${linkedHtml}
     </div>
     <div class="card">
       <h3>Catálogo (${catalog.length})</h3>
-      ${catalog.map((w) => `<p>${escapeHtml(w.nome)} · ${escapeHtml(w.preletor)}</p>`).join("") || "<p style='color:var(--muted)'>Vazio</p>"}
+      ${catalogHtml}
     </div>
   `);
   bindTabs();
-  root.querySelector("#eventSelect").onchange = (e) => { selectedEventId = Number(e.target.value); renderOficinas(events); };
+  root.querySelector("#eventSelect").onchange = (e) => {
+    selectedEventId = Number(e.target.value);
+    editingEventWorkshopLink = null;
+    renderOficinas(events);
+  };
+
+  root.querySelectorAll("[data-edit-link]").forEach((btn) => {
+    btn.onclick = () => {
+      editingEventWorkshopLink = { eventoId: selectedEventId, oficinaId: Number(btn.dataset.editLink) };
+      editingWorkshopId = null;
+      renderOficinas(events);
+    };
+  });
+
+  root.querySelectorAll("[data-unlink]").forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm("Remover esta oficina do evento? Inscrições já feitas mantêm a escolha, mas a oficina some da lista pública.")) return;
+      await unlinkWorkshopFromEvent(selectedEventId, Number(btn.dataset.unlink));
+      if (editingEventWorkshopLink?.oficinaId === Number(btn.dataset.unlink)) editingEventWorkshopLink = null;
+      renderOficinas(events);
+    };
+  });
+
+  root.querySelectorAll("[data-edit-catalog]").forEach((btn) => {
+    btn.onclick = () => {
+      editingWorkshopId = Number(btn.dataset.editCatalog);
+      editingEventWorkshopLink = null;
+      renderOficinas(events);
+    };
+  });
+
+  root.querySelectorAll("[data-del-catalog]").forEach((btn) => {
+    btn.onclick = async () => {
+      const id = Number(btn.dataset.delCatalog);
+      const links = await getWorkshopEventLinks(id);
+      if (links.length) {
+        alert("Desvincule esta oficina de todos os eventos antes de excluir do catálogo.");
+        return;
+      }
+      if (!confirm("Excluir esta oficina do catálogo?")) return;
+      await deleteWorkshop(id);
+      if (editingWorkshopId === id) editingWorkshopId = null;
+      renderOficinas(events);
+    };
+  });
+
+  const editCatalogForm = root.querySelector("#editCatalogForm");
+  if (editCatalogForm) {
+    editCatalogForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const nome = trimOrEmpty(fd.get("nome"));
+      const preletor = trimOrEmpty(fd.get("preletor"));
+      if (!nome || !preletor) {
+        alert("Informe nome e preletor.");
+        return;
+      }
+      await updateWorkshopCatalog(editingWorkshopId, nome, preletor);
+      editingWorkshopId = null;
+      renderOficinas(events);
+    };
+    editCatalogForm.querySelector('[data-action="cancel-catalog-edit"]').onclick = () => {
+      editingWorkshopId = null;
+      renderOficinas(events);
+    };
+  }
+
+  const editLinkForm = root.querySelector("#editLinkForm");
+  if (editLinkForm) {
+    editLinkForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const vagas = Number(fd.get("vagas"));
+      if (!vagas || vagas < 1) {
+        alert("Informe um número válido de vagas.");
+        return;
+      }
+      await updateEventWorkshopLink(
+        selectedEventId,
+        editingEventWorkshopLink.oficinaId,
+        vagas,
+        fd.get("preletor"),
+      );
+      editingEventWorkshopLink = null;
+      renderOficinas(events);
+    };
+    editLinkForm.querySelector('[data-action="cancel-link-edit"]').onclick = () => {
+      editingEventWorkshopLink = null;
+      renderOficinas(events);
+    };
+  }
 
   const linkForm = root.querySelector("#linkForm");
   if (linkForm) {
@@ -491,6 +666,10 @@ function bindTabs() {
   root.querySelectorAll(".tab[data-tab]").forEach((btn) => {
     btn.onclick = () => {
       if (btn.dataset.tab !== "eventos") editingEventId = null;
+      if (btn.dataset.tab !== "oficinas") {
+        editingWorkshopId = null;
+        editingEventWorkshopLink = null;
+      }
       tab = btn.dataset.tab;
       bootAdmin();
     };
