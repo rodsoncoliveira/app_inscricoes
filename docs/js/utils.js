@@ -80,6 +80,15 @@ export function resolveBanner(path) {
   return clean;
 }
 
+/** URL do banner com cache-bust para refletir trocas de imagem imediatamente. */
+export function bannerSrc(path) {
+  const resolved = resolveBanner(path);
+  if (!resolved) return null;
+  const token = encodeURIComponent(String(path).split("/").pop()?.split("?")[0] || "banner");
+  const sep = resolved.includes("?") ? "&" : "?";
+  return `${resolved}${sep}cb=${token}`;
+}
+
 export function renderSiteHeader(title, subtitle = "") {
   return `
     <div class="header-container">

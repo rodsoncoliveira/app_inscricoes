@@ -16,7 +16,7 @@ import {
   deleteEvent,
   uploadEventBanner,
   deleteEventBanner,
-} from "./api.js?v=10";
+} from "./api.js?v=11";
 import {
   escapeHtml,
   formatDateBR,
@@ -27,8 +27,8 @@ import {
   validateEventDates,
   normalizeWhatsappUrl,
   todayBR,
-  resolveBanner,
-} from "./utils.js?v=10";
+  bannerSrc,
+} from "./utils.js?v=11";
 
 const root = document.getElementById("admin-app");
 let tab = "dashboard";
@@ -258,9 +258,9 @@ function eventFormFields(ev = {}, { isEdit = false } = {}) {
     return raw && raw !== "undefined" ? raw : today;
   };
   const bannerPath = v("banner_path");
-  const bannerSrc = resolveBanner(bannerPath);
-  const bannerPreview = bannerSrc
-    ? `<div class="banner-preview"><img src="${escapeHtml(bannerSrc)}" alt="Banner atual"></div>`
+  const bannerUrl = bannerSrc(bannerPath);
+  const bannerPreview = bannerUrl
+    ? `<div class="banner-preview"><img src="${escapeHtml(bannerUrl)}" alt="Banner atual"></div>`
     : "";
   const removeBanner = isEdit && bannerPath
     ? `<label class="checkbox-row"><input type="checkbox" name="remove_banner"> Remover banner atual</label>`

@@ -5,8 +5,8 @@ import {
   createOrUpdateRegistration,
   updateRegistrationWorkshops,
   getRegistrationSummary,
-} from "./api.js?v=8";
-import { escapeHtml, formatDateBR, isMinor, todayBR, trimOrEmpty, resolveBanner, renderSiteHeader, showError } from "./utils.js?v=8";
+} from "./api.js?v=11";
+import { escapeHtml, formatDateBR, isMinor, todayBR, trimOrEmpty, bannerSrc, renderSiteHeader, showError } from "./utils.js?v=11";
 
 const root = document.getElementById("app");
 
@@ -44,7 +44,7 @@ async function renderHome() {
   }
 
   const cards = events.map((ev) => {
-    const banner = resolveBanner(ev.banner_path);
+    const banner = bannerSrc(ev.banner_path);
     const bannerHtml = banner
       ? `<div class="banner-frame"><img class="banner" src="${escapeHtml(banner)}" alt="Banner do evento"></div>`
       : "";
@@ -84,7 +84,7 @@ async function openEvent(id) {
 
 function renderRegisterForm(errorMsg = "", formValues = {}) {
   const ev = state.event;
-  const banner = resolveBanner(ev.banner_path);
+  const banner = bannerSrc(ev.banner_path);
   const birthValue = formValues.data_nascimento || "2000-01-01";
   const minor = isMinor(birthValue);
 
